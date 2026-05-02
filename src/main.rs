@@ -15,7 +15,7 @@ use tracing::{info, span};
 use tracing_subscriber::Registry;
 use tracing_subscriber::prelude::*;
 
-const SERVICE_NAME: &str = "axum_starter";
+const SERVICE_NAME: &str = "headless_cms";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {

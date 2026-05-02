@@ -11,9 +11,11 @@ sea-orm = { version = "2.0.0-rc.38", features = [
 ] }
 
 [package]
-name = "axum-starter"
+name = "headless-cms"
 version = "0.1.0"
 edition = "2024"
+description = "A headless CMS built with Axum and SeaORM"
+repository = "https://github.com/oungseik/headless-cms"
 
 [dependencies]
 axum = { version = "0.8.9" }

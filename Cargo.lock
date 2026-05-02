@@ -400,31 +400,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "axum-starter"
-version = "0.1.0"
-dependencies = [
- "axum",
- "axum-tracing-opentelemetry",
- "clap",
- "dotenv",
- "entity",
- "migration",
- "opentelemetry",
- "opentelemetry-otlp",
- "opentelemetry_sdk",
- "sea-orm",
- "serde",
- "tokio",
- "tower-http",
- "tracing",
- "tracing-opentelemetry",
- "tracing-subscriber",
- "utoipa",
- "utoipa-axum",
- "utoipa-swagger-ui",
-]
-
-[[package]]
 name = "axum-tracing-opentelemetry"
 version = "0.33.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1153,6 +1128,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7382cf6263419f2d8df38c55d7da83da5c18aef87fc7a7fc1fb1e344edfe14c1"
 dependencies = [
  "hashbrown 0.15.5",
+]
+
+[[package]]
+name = "headless-cms"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "axum-tracing-opentelemetry",
+ "clap",
+ "dotenv",
+ "entity",
+ "migration",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
+ "sea-orm",
+ "serde",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+ "utoipa",
+ "utoipa-axum",
+ "utoipa-swagger-ui",
 ]
 
 [[package]]

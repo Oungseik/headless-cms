@@ -1,6 +1,6 @@
-# Axum Starter Project
+# Headless CMS
 
-A basic starter for Axum with SeaORM and preconfigured OpenAPI, OpenTelemetry.
+A headless CMS built with Axum, SeaORM, and preconfigured OpenAPI, OpenTelemetry.
 
 ## Table of Contents
 
@@ -9,7 +9,7 @@ A basic starter for Axum with SeaORM and preconfigured OpenAPI, OpenTelemetry.
 
 ## Project Overview
 
-This project is a starter template for building web applications using the following technologies:
+A headless CMS for managing and delivering content via API, built with the following technologies:
 
 - [**Axum**](https://github.com/tokio-rs/axum): A web framework for building robust and scalable web applications.
 - [**SeaORM**](https://github.com/SeaQL/sea-orm): An async ORM built on top of sqlx for interacting with databases.
