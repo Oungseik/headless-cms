@@ -6,3 +6,6 @@ edition = "2024"
 [dependencies]
 sea-orm = { workspace = true, features = ["macros", "with-chrono"] }
 serde = { version = "1", features = ["derive"] }
+
+[lints]
+workspace = true
