@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 mod app;
 mod config;
+mod features;
 
 use app::create_app;
 use config::get_config;

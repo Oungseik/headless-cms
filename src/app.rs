@@ -1,22 +1,20 @@
-mod error;
-mod handlers;
+pub mod error;
 
 use std::sync::Arc;
 
 use axum::Router;
 use axum::http::Method;
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
-use handlers::health;
-use handlers::users;
 use migration::{Migrator, MigratorTrait};
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use tower_http::cors::{Any, CorsLayer};
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
 use utoipa::{Modify, OpenApi};
-use utoipa_axum::{router::OpenApiRouter, routes};
+use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::get_config;
+use crate::features;
 
 #[derive(OpenApi)]
 #[openapi( modifiers(&SecurityAddon))]
@@ -53,8 +51,8 @@ pub async fn create_app() -> Result<Router, sea_orm::DbErr> {
     let db = setup_db().await?;
     let state = Arc::new(AppState { db });
 
-    let health_route = OpenApiRouter::new().routes(routes!(health::check_health::handler));
-    let users_route = OpenApiRouter::new().routes(routes!(users::get_by_id::handler));
+    let health_route = features::health::router();
+    let users_route = features::users::router();
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/health", health_route)
