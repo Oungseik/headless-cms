@@ -12,6 +12,7 @@ pub struct ErrorResponse {
     message: String,
 }
 
+#[derive(Debug)]
 pub enum AppError {
     InternalServerError,
     NotFound,
