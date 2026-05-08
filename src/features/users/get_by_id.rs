@@ -60,8 +60,8 @@ mod tests {
     use axum::extract::{Path, State};
 
     use crate::app::AppState;
-    use crate::features::users::mock_service::tests::MockUserService;
     use crate::features::users::service::UserService;
+    use crate::features::users::service_mock::tests::MockUserService;
 
     #[tokio::test]
     async fn test_get_user_by_id_found() {

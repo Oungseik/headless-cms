@@ -3,7 +3,7 @@ pub mod service;
 pub mod service_impl;
 
 #[cfg(test)]
-pub mod mock_service;
+pub mod service_mock;
 
 use std::sync::Arc;
 
