@@ -15,6 +15,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::get_config;
 use crate::features;
+use crate::features::auth::email_service::ConsoleEmailService;
 use crate::features::auth::service::AuthService;
 use crate::features::users::service::UserService;
 
@@ -61,10 +62,16 @@ pub async fn create_app() -> Result<Router, sea_orm::DbErr> {
         .allow_origin(Any);
 
     let db = setup_db().await?;
+    let config = get_config();
     let user_service: Arc<dyn UserService> =
         Arc::new(crate::features::users::service_impl::UserServiceImpl { db: db.clone() });
+    let email_service = Arc::new(ConsoleEmailService);
     let auth_service: Arc<dyn AuthService> =
-        Arc::new(crate::features::auth::service_impl::AuthServiceImpl { db });
+        Arc::new(crate::features::auth::service_impl::AuthServiceImpl {
+            db,
+            email_service,
+            config: Arc::new(config.clone()),
+        });
     let state = Arc::new(AppState {
         user_service,
         auth_service,

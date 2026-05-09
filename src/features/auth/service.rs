@@ -5,8 +5,9 @@ use chrono::NaiveDateTime;
 
 #[derive(Debug)]
 pub enum AuthServiceError {
-    NotFound,
-    Unauthorized,
+    NotFound(String),
+    Unauthorized(String),
+    NotVerified(String),
     Conflict(String),
     Database(sea_orm::DbErr),
 }
@@ -14,8 +15,9 @@ pub enum AuthServiceError {
 impl fmt::Display for AuthServiceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::NotFound => write!(f, "user not found"),
-            Self::Unauthorized => write!(f, "invalid credentials"),
+            Self::NotFound(msg) => write!(f, "not found: {msg}"),
+            Self::Unauthorized(msg) => write!(f, "unauthorized: {msg}"),
+            Self::NotVerified(msg) => write!(f, "not verified: {msg}"),
             Self::Conflict(msg) => write!(f, "conflict: {msg}"),
             Self::Database(err) => write!(f, "database error: {err}"),
         }
@@ -24,11 +26,10 @@ impl fmt::Display for AuthServiceError {
 
 impl std::error::Error for AuthServiceError {}
 
-#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UserResponse {
     pub id: i32,
-    pub username: String,
     pub email: String,
     pub role: String,
     pub is_active: bool,
@@ -39,7 +40,6 @@ impl From<entity::user::Model> for UserResponse {
     fn from(m: entity::user::Model) -> Self {
         Self {
             id: m.id,
-            username: m.username,
             email: m.email,
             role: m.role,
             is_active: m.is_active,
@@ -48,7 +48,7 @@ impl From<entity::user::Model> for UserResponse {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthResponse {
     pub user: UserResponse,
@@ -56,27 +56,45 @@ pub struct AuthResponse {
     pub refresh_token: String,
 }
 
-#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RefreshResponse {
     pub access_token: String,
     pub refresh_token: String,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RegisterResponse {
+    pub message: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct VerifyEmailResponse {
+    pub message: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ResendVerificationResponse {
+    pub message: String,
+}
+
 #[async_trait]
 pub trait AuthService: Send + Sync + 'static {
     async fn register(
         &self,
-        username: String,
-        email: String,
-        password: String,
-        role: String,
-    ) -> Result<AuthResponse, AuthServiceError>;
-    async fn login(
+        email: &str,
+        password: &str,
+        role: &str,
+    ) -> Result<RegisterResponse, AuthServiceError>;
+    async fn login(&self, email: &str, password: &str) -> Result<AuthResponse, AuthServiceError>;
+    async fn verify_email(&self, token: &str) -> Result<VerifyEmailResponse, AuthServiceError>;
+    async fn resend_verification(
         &self,
-        username: String,
-        password: String,
-    ) -> Result<AuthResponse, AuthServiceError>;
-    async fn refresh(&self, token: String) -> Result<RefreshResponse, AuthServiceError>;
-    async fn logout(&self, token: String) -> Result<(), AuthServiceError>;
+        email: &str,
+    ) -> Result<ResendVerificationResponse, AuthServiceError>;
+    async fn refresh(&self, token: &str) -> Result<RefreshResponse, AuthServiceError>;
+    async fn logout(&self, token: &str) -> Result<(), AuthServiceError>;
 }

@@ -22,7 +22,7 @@ pub enum AppError {
     InternalServerError,
     NotFound,
     Unauthorized,
-    Forbidden,
+    Forbidden(String),
     BadRequest(String),
     Conflict(String),
 }
@@ -42,8 +42,9 @@ impl From<UserServiceError> for AppError {
 impl From<AuthServiceError> for AppError {
     fn from(err: AuthServiceError) -> Self {
         match err {
-            AuthServiceError::NotFound => Self::NotFound,
-            AuthServiceError::Unauthorized => Self::Unauthorized,
+            AuthServiceError::NotFound(_) => Self::NotFound,
+            AuthServiceError::Unauthorized(_) => Self::Unauthorized,
+            AuthServiceError::NotVerified(msg) => Self::Forbidden(msg),
             AuthServiceError::Conflict(msg) => Self::Conflict(msg),
             AuthServiceError::Database(db_err) => {
                 tracing::error!(%db_err, "database error");
@@ -80,10 +81,10 @@ impl IntoResponse for AppError {
                     details: None,
                 }),
             ),
-            Self::Forbidden => (
+            Self::Forbidden(msg) => (
                 StatusCode::FORBIDDEN,
                 Json(ErrorResponse {
-                    message: "Forbidden".into(),
+                    message: msg,
                     details: None,
                 }),
             ),

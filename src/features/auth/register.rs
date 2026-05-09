@@ -7,12 +7,11 @@ use utoipa::ToSchema;
 
 use crate::app::AppState;
 use crate::app::error::{AppError, AppResult, ErrorResponse};
-use crate::features::auth::service::AuthResponse;
+use crate::features::auth::service::RegisterResponse;
 
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RegisterRequest {
-    pub username: String,
     pub email: String,
     pub password: String,
 }
@@ -24,8 +23,8 @@ pub struct RegisterRequest {
     description = "Register a new customer account",
     request_body = RegisterRequest,
     responses(
-        (status = 200, description = "Registration successful", body = AuthResponse),
-        (status = 409, description = "Username already exists", body = ErrorResponse),
+        (status = 200, description = "Registration successful", body = RegisterResponse),
+        (status = 409, description = "Email already registered", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     tag = "Auth",
@@ -34,10 +33,10 @@ pub struct RegisterRequest {
 pub async fn handler(
     State(state): State<Arc<AppState>>,
     Json(body): Json<RegisterRequest>,
-) -> AppResult<Json<AuthResponse>> {
+) -> AppResult<Json<RegisterResponse>> {
     let response = state
         .auth_service
-        .register(body.username, body.email, body.password, "customer".into())
+        .register(&body.email, &body.password, "customer")
         .await
         .map_err(AppError::from)?;
     Ok(Json(response))
@@ -75,7 +74,6 @@ mod tests {
         let result = super::handler(
             State(state),
             Json(RegisterRequest {
-                username: "newuser".into(),
                 email: "new@example.com".into(),
                 password: "password123".into(),
             }),
@@ -83,29 +81,19 @@ mod tests {
         .await;
 
         let response = result.expect("register should succeed");
-        assert_eq!(response.0.user.username, "newuser");
-        assert_eq!(response.0.user.role, "customer");
-        assert!(!response.0.access_token.is_empty());
+        assert!(!response.0.message.is_empty());
     }
 
     #[tokio::test]
-    async fn test_register_duplicate_username() {
+    async fn test_register_duplicate_email() {
         let auth = setup_auth_service();
-        auth.register(
-            "existing".into(),
-            "a@b.com".into(),
-            "pass".into(),
-            "customer".into(),
-        )
-        .await
-        .unwrap();
+        auth.register("a@b.com", "pass", "customer").await.unwrap();
 
         let state = setup_app_state(auth);
         let result = super::handler(
             State(state),
             Json(RegisterRequest {
-                username: "existing".into(),
-                email: "other@b.com".into(),
+                email: "a@b.com".into(),
                 password: "pass".into(),
             }),
         )

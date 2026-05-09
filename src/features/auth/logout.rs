@@ -39,7 +39,7 @@ pub async fn handler(
 ) -> AppResult<Json<LogoutResponse>> {
     state
         .auth_service
-        .logout(body.refresh_token)
+        .logout(&body.refresh_token)
         .await
         .map_err(AppError::from)?;
     Ok(Json(LogoutResponse {
@@ -60,10 +60,6 @@ mod tests {
     use crate::features::auth::service_mock::tests::MockAuthService;
     use crate::features::users::service_mock::tests::MockUserService;
 
-    fn setup_auth_service() -> Arc<dyn AuthService> {
-        Arc::new(MockAuthService::new())
-    }
-
     fn setup_app_state(auth: Arc<dyn AuthService>) -> Arc<AppState> {
         Arc::new(AppState {
             user_service: Arc::new(MockUserService::new()),
@@ -71,62 +67,47 @@ mod tests {
         })
     }
 
-    #[tokio::test]
-    async fn test_logout_success() {
-        let auth = setup_auth_service();
-        let reg = auth
-            .register(
-                "testuser".into(),
-                "test@example.com".into(),
-                "password123".into(),
-                "customer".into(),
-            )
+    /// Helper: register, verify, and login to obtain a refresh token.
+    async fn get_refresh_token(mock: &Arc<MockAuthService>) -> String {
+        mock.register("test@example.com", "password123", "customer")
             .await
             .unwrap();
+        mock.verified_emails
+            .lock()
+            .expect("mutex poisoned")
+            .insert("test@example.com".to_string());
+        let login_res = mock.login("test@example.com", "password123").await.unwrap();
+        login_res.refresh_token
+    }
 
-        let state = setup_app_state(auth);
-        let result = super::handler(
-            State(state),
-            Json(LogoutRequest {
-                refresh_token: reg.refresh_token,
-            }),
-        )
-        .await;
+    #[tokio::test]
+    async fn test_logout_success() {
+        let mock = Arc::new(MockAuthService::new());
+        let refresh_token = get_refresh_token(&mock).await;
+
+        let state = setup_app_state(mock.clone());
+        let result = super::handler(State(state), Json(LogoutRequest { refresh_token })).await;
 
         assert!(result.is_ok());
     }
 
     #[tokio::test]
     async fn test_logout_idempotent() {
-        let auth = setup_auth_service();
-        let reg = auth
-            .register(
-                "testuser".into(),
-                "test@example.com".into(),
-                "password123".into(),
-                "customer".into(),
-            )
-            .await
-            .unwrap();
+        let mock = Arc::new(MockAuthService::new());
+        let refresh_token = get_refresh_token(&mock).await;
 
-        let state = setup_app_state(auth.clone());
+        let state = setup_app_state(mock.clone());
 
         let result1 = super::handler(
             State(state.clone()),
             Json(LogoutRequest {
-                refresh_token: reg.refresh_token.clone(),
+                refresh_token: refresh_token.clone(),
             }),
         )
         .await;
         assert!(result1.is_ok());
 
-        let result2 = super::handler(
-            State(state),
-            Json(LogoutRequest {
-                refresh_token: reg.refresh_token,
-            }),
-        )
-        .await;
+        let result2 = super::handler(State(state), Json(LogoutRequest { refresh_token })).await;
         assert!(result2.is_ok());
     }
 }

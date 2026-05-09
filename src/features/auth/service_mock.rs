@@ -1,18 +1,21 @@
 #[cfg(test)]
 pub mod tests {
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
     use std::sync::Mutex;
 
     use async_trait::async_trait;
 
     use crate::features::auth::service::{
-        AuthResponse, AuthService, AuthServiceError, RefreshResponse, UserResponse,
+        AuthResponse, AuthService, AuthServiceError, RefreshResponse, RegisterResponse,
+        ResendVerificationResponse, UserResponse, VerifyEmailResponse,
     };
 
     #[derive(Debug)]
     pub struct MockAuthService {
         pub users: Mutex<HashMap<String, entity::user::Model>>,
         pub refresh_tokens: Mutex<HashMap<String, i32>>,
+        pub verified_emails: Mutex<HashSet<String>>,
+        pub verification_tokens: Mutex<HashMap<String, String>>,
         pub next_id: Mutex<i32>,
     }
 
@@ -21,6 +24,8 @@ pub mod tests {
             Self {
                 users: Mutex::new(HashMap::new()),
                 refresh_tokens: Mutex::new(HashMap::new()),
+                verified_emails: Mutex::new(HashSet::new()),
+                verification_tokens: Mutex::new(HashMap::new()),
                 next_id: Mutex::new(1),
             }
         }
@@ -37,16 +42,15 @@ pub mod tests {
     impl AuthService for MockAuthService {
         async fn register(
             &self,
-            username: String,
-            email: String,
-            password: String,
-            role: String,
-        ) -> Result<AuthResponse, AuthServiceError> {
+            email: &str,
+            password: &str,
+            role: &str,
+        ) -> Result<RegisterResponse, AuthServiceError> {
             let mut users = self.users.lock().expect("mutex poisoned");
-            if users.contains_key(&username) {
-                return Err(AuthServiceError::Conflict(format!(
-                    "username '{username}' already exists"
-                )));
+            if users.contains_key(email) {
+                return Err(AuthServiceError::Conflict(
+                    "Email already registered".to_string(),
+                ));
             }
 
             let mut next_id = self.next_id.lock().expect("mutex poisoned");
@@ -56,45 +60,50 @@ pub mod tests {
             let now = chrono::Utc::now().naive_utc();
             let user = entity::user::Model {
                 id,
-                username: username.clone(),
-                email,
+                email: email.to_string(),
                 password_hash: format!("hashed_{password}"),
-                role,
+                role: role.to_string(),
                 is_active: true,
-                created_at: now,
+                email_verified_at: None,
                 updated_at: now,
+                created_at: now,
             };
 
-            users.insert(username.clone(), user.clone());
+            users.insert(email.to_string(), user);
 
-            let access_token = format!("access_{id}");
-            let refresh_token = format!("refresh_{id}");
-
-            let mut tokens = self.refresh_tokens.lock().expect("mutex poisoned");
-            tokens.insert(Self::hash_token(&refresh_token), id);
-
-            Ok(AuthResponse {
-                user: UserResponse::from(user),
-                access_token,
-                refresh_token,
+            Ok(RegisterResponse {
+                message: "Please check your email to verify your account.".to_string(),
             })
         }
 
         async fn login(
             &self,
-            username: String,
-            password: String,
+            email: &str,
+            password: &str,
         ) -> Result<AuthResponse, AuthServiceError> {
             let users = self.users.lock().expect("mutex poisoned");
-            let user = users.get(&username).ok_or(AuthServiceError::NotFound)?;
+            let user = users.get(email).ok_or_else(|| {
+                AuthServiceError::NotFound("Invalid email or password".to_string())
+            })?;
 
             if !user.is_active {
-                return Err(AuthServiceError::Unauthorized);
+                return Err(AuthServiceError::Unauthorized(
+                    "Account is deactivated".to_string(),
+                ));
             }
 
             let expected_hash = format!("hashed_{password}");
             if user.password_hash != expected_hash {
-                return Err(AuthServiceError::Unauthorized);
+                return Err(AuthServiceError::Unauthorized(
+                    "Invalid email or password".to_string(),
+                ));
+            }
+
+            let verified_emails = self.verified_emails.lock().expect("mutex poisoned");
+            if !verified_emails.contains(email) {
+                return Err(AuthServiceError::NotVerified(
+                    "Email not verified. Please check your email.".to_string(),
+                ));
             }
 
             let id = user.id;
@@ -114,12 +123,35 @@ pub mod tests {
             })
         }
 
-        async fn refresh(&self, token: String) -> Result<RefreshResponse, AuthServiceError> {
+        async fn verify_email(&self, token: &str) -> Result<VerifyEmailResponse, AuthServiceError> {
+            let mut verification_tokens = self.verification_tokens.lock().expect("mutex poisoned");
+            let email = verification_tokens.remove(token).ok_or_else(|| {
+                AuthServiceError::NotFound("Invalid verification token".to_string())
+            })?;
+
+            let mut verified_emails = self.verified_emails.lock().expect("mutex poisoned");
+            verified_emails.insert(email);
+
+            Ok(VerifyEmailResponse {
+                message: "Email verified successfully. You can now log in.".to_string(),
+            })
+        }
+
+        async fn resend_verification(
+            &self,
+            _email: &str,
+        ) -> Result<ResendVerificationResponse, AuthServiceError> {
+            Ok(ResendVerificationResponse {
+                message: "If an account with that email exists and is not yet verified, we've sent a verification email.".to_string(),
+            })
+        }
+
+        async fn refresh(&self, token: &str) -> Result<RefreshResponse, AuthServiceError> {
             let tokens = self.refresh_tokens.lock().expect("mutex poisoned");
-            let token_hash = Self::hash_token(&token);
-            let user_id = tokens
-                .get(&token_hash)
-                .ok_or(AuthServiceError::Unauthorized)?;
+            let token_hash = Self::hash_token(token);
+            let user_id = tokens.get(&token_hash).ok_or_else(|| {
+                AuthServiceError::Unauthorized("Invalid refresh token".to_string())
+            })?;
             let user_id = *user_id;
             drop(tokens);
 
@@ -127,9 +159,11 @@ pub mod tests {
             let user = users
                 .values()
                 .find(|u| u.id == user_id)
-                .ok_or(AuthServiceError::NotFound)?;
+                .ok_or_else(|| AuthServiceError::NotFound("User not found".to_string()))?;
             if !user.is_active {
-                return Err(AuthServiceError::Unauthorized);
+                return Err(AuthServiceError::Unauthorized(
+                    "Account is deactivated".to_string(),
+                ));
             }
 
             let mut tokens = self.refresh_tokens.lock().expect("mutex poisoned");
@@ -145,8 +179,8 @@ pub mod tests {
             })
         }
 
-        async fn logout(&self, token: String) -> Result<(), AuthServiceError> {
-            let token_hash = Self::hash_token(&token);
+        async fn logout(&self, token: &str) -> Result<(), AuthServiceError> {
+            let token_hash = Self::hash_token(token);
             let mut tokens = self.refresh_tokens.lock().expect("mutex poisoned");
             tokens.remove(&token_hash);
             Ok(())

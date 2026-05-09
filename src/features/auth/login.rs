@@ -12,7 +12,7 @@ use crate::features::auth::service::AuthResponse;
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LoginRequest {
-    pub username: String,
+    pub email: String,
     pub password: String,
 }
 
@@ -20,11 +20,12 @@ pub struct LoginRequest {
     post,
     path = "/login",
     operation_id = "login",
-    description = "Login with username and password",
+    description = "Login with email and password",
     request_body = LoginRequest,
     responses(
         (status = 200, description = "Login successful", body = AuthResponse),
         (status = 401, description = "Invalid credentials", body = ErrorResponse),
+        (status = 403, description = "Email not verified", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     tag = "Auth",
@@ -36,7 +37,7 @@ pub async fn handler(
 ) -> AppResult<Json<AuthResponse>> {
     let response = state
         .auth_service
-        .login(body.username, body.password)
+        .login(&body.email, &body.password)
         .await
         .map_err(AppError::from)?;
     Ok(Json(response))
@@ -55,10 +56,6 @@ mod tests {
     use crate::features::auth::service_mock::tests::MockAuthService;
     use crate::features::users::service_mock::tests::MockUserService;
 
-    fn setup_auth_service() -> Arc<dyn AuthService> {
-        Arc::new(MockAuthService::new())
-    }
-
     fn setup_app_state(auth: Arc<dyn AuthService>) -> Arc<AppState> {
         Arc::new(AppState {
             user_service: Arc::new(MockUserService::new()),
@@ -68,49 +65,48 @@ mod tests {
 
     #[tokio::test]
     async fn test_login_success() {
-        let auth = setup_auth_service();
-        auth.register(
-            "testuser".into(),
-            "test@example.com".into(),
-            "password123".into(),
-            "customer".into(),
-        )
-        .await
-        .unwrap();
+        let mock = Arc::new(MockAuthService::new());
+        mock.register("test@example.com", "password123", "customer")
+            .await
+            .unwrap();
+        mock.verified_emails
+            .lock()
+            .expect("mutex poisoned")
+            .insert("test@example.com".to_string());
 
-        let state = setup_app_state(auth);
+        let state = setup_app_state(mock.clone());
         let result = super::handler(
             State(state),
             Json(LoginRequest {
-                username: "testuser".into(),
+                email: "test@example.com".into(),
                 password: "password123".into(),
             }),
         )
         .await;
 
         let response = result.expect("login should succeed");
-        assert_eq!(response.0.user.username, "testuser");
+        assert_eq!(response.0.user.email, "test@example.com");
+        assert_eq!(response.0.user.role, "customer");
         assert!(!response.0.access_token.is_empty());
         assert!(!response.0.refresh_token.is_empty());
     }
 
     #[tokio::test]
     async fn test_login_wrong_password() {
-        let auth = setup_auth_service();
-        auth.register(
-            "testuser".into(),
-            "test@example.com".into(),
-            "password123".into(),
-            "customer".into(),
-        )
-        .await
-        .unwrap();
+        let mock = Arc::new(MockAuthService::new());
+        mock.register("test@example.com", "password123", "customer")
+            .await
+            .unwrap();
+        mock.verified_emails
+            .lock()
+            .expect("mutex poisoned")
+            .insert("test@example.com".to_string());
 
-        let state = setup_app_state(auth);
+        let state = setup_app_state(mock.clone());
         let result = super::handler(
             State(state),
             Json(LoginRequest {
-                username: "testuser".into(),
+                email: "test@example.com".into(),
                 password: "wrongpassword".into(),
             }),
         )
@@ -121,13 +117,33 @@ mod tests {
 
     #[tokio::test]
     async fn test_login_user_not_found() {
-        let auth = setup_auth_service();
-        let state = setup_app_state(auth);
+        let mock = Arc::new(MockAuthService::new());
+        let state = setup_app_state(mock.clone());
 
         let result = super::handler(
             State(state),
             Json(LoginRequest {
-                username: "nonexistent".into(),
+                email: "nonexistent@example.com".into(),
+                password: "password123".into(),
+            }),
+        )
+        .await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_login_not_verified() {
+        let mock = Arc::new(MockAuthService::new());
+        mock.register("unverified@example.com", "password123", "customer")
+            .await
+            .unwrap();
+
+        let state = setup_app_state(mock.clone());
+        let result = super::handler(
+            State(state),
+            Json(LoginRequest {
+                email: "unverified@example.com".into(),
                 password: "password123".into(),
             }),
         )

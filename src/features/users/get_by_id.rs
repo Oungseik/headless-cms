@@ -13,7 +13,6 @@ use crate::app::error::{AppError, AppResult, ErrorResponse};
 #[serde(rename_all = "camelCase")]
 pub struct UserResponse {
     pub id: i32,
-    pub username: String,
     pub email: String,
     pub created_at: NaiveDateTime,
 }
@@ -22,7 +21,6 @@ impl From<entity::user::Model> for UserResponse {
     fn from(model: entity::user::Model) -> Self {
         Self {
             id: model.id,
-            username: model.username,
             email: model.email,
             created_at: model.created_at,
         }
@@ -74,11 +72,11 @@ mod tests {
         let now = chrono::Utc::now().naive_utc();
         let test_user = entity::user::Model {
             id: 1,
-            username: "testuser".into(),
             email: "test@example.com".into(),
             password_hash: String::new(),
             role: "customer".into(),
             is_active: true,
+            email_verified_at: None,
             updated_at: now,
             created_at: now,
         };
@@ -99,7 +97,6 @@ mod tests {
         let user = response.0;
 
         assert_eq!(user.id, 1);
-        assert_eq!(user.username, "testuser");
         assert_eq!(user.email, "test@example.com");
     }
 

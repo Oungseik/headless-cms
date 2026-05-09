@@ -66,7 +66,7 @@ impl FromRequestParts<Arc<AppState>> for AdminUser {
         let auth_user = AuthUser::from_request_parts(parts, state).await?;
 
         if auth_user.role != "admin" {
-            return Err(AppError::Forbidden);
+            return Err(AppError::Forbidden("Admin access required".into()));
         }
 
         Ok(Self {
@@ -174,7 +174,7 @@ mod tests {
         let mut parts = make_parts_with_token(&token);
         let result = AdminUser::from_request_parts(&mut parts, &state).await;
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), AppError::Forbidden));
+        assert!(matches!(result.unwrap_err(), AppError::Forbidden(_)));
     }
 
     #[tokio::test]

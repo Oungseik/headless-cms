@@ -1,0 +1,2 @@
+- strictly follow rust 2024 edition pattern. Don't use `mod.rs` use `<name>.rs` and `<name>/` pattern instead.
+- run `cargo check` and `cargo fmt`
