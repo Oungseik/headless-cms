@@ -6,6 +6,8 @@ pub mod register;
 pub mod resend_verification;
 pub mod service;
 pub mod service_impl;
+#[cfg(feature = "test")]
+pub mod verify_all;
 pub mod verify_email;
 
 #[cfg(test)]
@@ -18,11 +20,16 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 use crate::app::AppState;
 
 pub fn router() -> OpenApiRouter<Arc<AppState>> {
-    OpenApiRouter::new()
+    let router = OpenApiRouter::new()
         .routes(routes!(login::handler))
         .routes(routes!(register::handler))
         .routes(routes!(verify_email::handler))
         .routes(routes!(resend_verification::handler))
         .routes(routes!(refresh::handler))
-        .routes(routes!(logout::handler))
+        .routes(routes!(logout::handler));
+
+    #[cfg(feature = "test")]
+    let router = router.route("/test/verify-all", axum::routing::post(verify_all::handler));
+
+    router
 }
