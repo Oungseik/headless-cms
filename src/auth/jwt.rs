@@ -80,3 +80,54 @@ pub fn validate_refresh_token(
     )?;
     Ok(token_data.claims)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_and_validate_access_token() {
+        let token = generate_access_token(42, "admin").unwrap();
+        let claims = validate_access_token(&token).unwrap();
+        assert_eq!(claims.sub, "42");
+        assert_eq!(claims.role, "admin");
+        assert!(claims.exp > claims.iat);
+    }
+
+    #[test]
+    fn test_generate_and_validate_refresh_token() {
+        let token = generate_refresh_token(7).unwrap();
+        let claims = validate_refresh_token(&token).unwrap();
+        assert_eq!(claims.sub, "7");
+        assert_eq!(claims.typ, "refresh");
+        assert!(claims.exp > claims.iat);
+    }
+
+    #[test]
+    fn test_validate_access_token_invalid() {
+        let result = validate_access_token("not.a.real.token");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_access_token_wrong_secret() {
+        let token = generate_access_token(1, "customer").unwrap();
+        let wrong_key = jsonwebtoken::DecodingKey::from_secret(b"wrong-secret");
+        let result = jsonwebtoken::decode::<TokenClaims>(
+            &token,
+            &wrong_key,
+            &jsonwebtoken::Validation::default(),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_refresh_token_with_access_token() {
+        let refresh_token = generate_refresh_token(1).unwrap();
+        let result = validate_access_token(&refresh_token);
+        assert!(
+            result.is_err(),
+            "refresh token should not be valid as access token"
+        );
+    }
+}
