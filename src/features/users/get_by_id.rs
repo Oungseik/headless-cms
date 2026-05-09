@@ -32,6 +32,7 @@ impl From<entity::user::Model> for UserResponse {
 #[utoipa::path(
     get,
     path = "/{id}",
+    operation_id = "get_user_by_id",
     description = "Get a user by ID",
     responses(
         (status = 200, description = "Get the user information", body = UserResponse),

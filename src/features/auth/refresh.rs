@@ -18,6 +18,7 @@ pub struct RefreshRequest {
 #[utoipa::path(
     post,
     path = "/refresh",
+    operation_id = "refresh",
     description = "Refresh access token using a valid refresh token",
     request_body = RefreshRequest,
     responses(
