@@ -1,6 +1,6 @@
-# Headless CMS
+# POS Backend
 
-A headless CMS built with Axum, SeaORM, and preconfigured OpenAPI, OpenTelemetry.
+A headless POS + CMS backend built with Axum, SeaORM, and preconfigured OpenAPI, OpenTelemetry.
 
 ## Table of Contents
 
@@ -9,7 +9,7 @@ A headless CMS built with Axum, SeaORM, and preconfigured OpenAPI, OpenTelemetry
 
 ## Project Overview
 
-A headless CMS for managing and delivering content via API, built with the following technologies:
+A headless POS + CMS backend for managing products, orders, and content via API, built with the following technologies:
 
 - [**Axum**](https://github.com/tokio-rs/axum): A web framework for building robust and scalable web applications.
 - [**SeaORM**](https://github.com/SeaQL/sea-orm): An async ORM built on top of sqlx for interacting with databases.

@@ -73,12 +73,13 @@ mod tests {
             email: "test@example.com".into(),
             created_at: chrono::Utc::now().naive_utc(),
         };
-        mock.users.lock().expect("mock users mutex poisoned").insert(1, test_user.clone());
+        mock.users
+            .lock()
+            .expect("mock users mutex poisoned")
+            .insert(1, test_user.clone());
 
         let mock: Arc<dyn UserService> = Arc::new(mock);
-        let state = Arc::new(AppState {
-            user_service: mock,
-        });
+        let state = Arc::new(AppState { user_service: mock });
 
         let result = super::handler(State(state), Path(1)).await;
         let response = result.unwrap_or_else(|e| panic!("handler should return Ok: {e:?}"));
@@ -92,9 +93,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_by_id_not_found() {
         let mock: Arc<dyn UserService> = Arc::new(MockUserService::new());
-        let state = Arc::new(AppState {
-            user_service: mock,
-        });
+        let state = Arc::new(AppState { user_service: mock });
 
         let result = super::handler(State(state), Path(999)).await;
         assert!(result.is_err());

@@ -1,6 +1,6 @@
 # Conventions
 
-Living reference for adding features to this Rust/Axum/SeaORM headless CMS.
+Living reference for adding features to this Rust/Axum/SeaORM POS + CMS backend.
 
 ## Architecture Overview
 

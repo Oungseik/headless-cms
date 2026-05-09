@@ -21,7 +21,10 @@ pub mod tests {
 
     #[async_trait]
     impl UserService for MockUserService {
-        async fn get_by_id(&self, id: i32) -> Result<Option<entity::user::Model>, UserServiceError> {
+        async fn get_by_id(
+            &self,
+            id: i32,
+        ) -> Result<Option<entity::user::Model>, UserServiceError> {
             let users = self.users.lock().expect("mock users mutex poisoned");
             Ok(users.get(&id).cloned())
         }

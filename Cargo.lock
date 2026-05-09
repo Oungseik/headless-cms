@@ -1133,33 +1133,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "headless-cms"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "axum",
- "axum-tracing-opentelemetry",
- "chrono",
- "clap",
- "dotenv",
- "entity",
- "migration",
- "opentelemetry",
- "opentelemetry-otlp",
- "opentelemetry_sdk",
- "sea-orm",
- "serde",
- "tokio",
- "tower-http",
- "tracing",
- "tracing-opentelemetry",
- "tracing-subscriber",
- "utoipa",
- "utoipa-axum",
- "utoipa-swagger-ui",
-]
-
-[[package]]
 name = "heck"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2070,6 +2043,33 @@ checksum = "4b3eba432a00a1f6c16f39147847a870e94e2e9b992759b503e330efec778cbe"
 dependencies = [
  "once_cell",
  "regex",
+]
+
+[[package]]
+name = "pos-backend"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "axum-tracing-opentelemetry",
+ "chrono",
+ "clap",
+ "dotenv",
+ "entity",
+ "migration",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
+ "sea-orm",
+ "serde",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+ "utoipa",
+ "utoipa-axum",
+ "utoipa-swagger-ui",
 ]
 
 [[package]]
