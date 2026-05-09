@@ -43,9 +43,7 @@ pub fn generate_access_token(
     )
 }
 
-pub fn generate_refresh_token(
-    user_id: i32,
-) -> Result<String, jsonwebtoken::errors::Error> {
+pub fn generate_refresh_token(user_id: i32) -> Result<String, jsonwebtoken::errors::Error> {
     let config = get_config();
     let now = Utc::now();
     let claims = RefreshTokenClaims {
@@ -61,9 +59,7 @@ pub fn generate_refresh_token(
     )
 }
 
-pub fn validate_access_token(
-    token: &str,
-) -> Result<TokenClaims, jsonwebtoken::errors::Error> {
+pub fn validate_access_token(token: &str) -> Result<TokenClaims, jsonwebtoken::errors::Error> {
     let config = get_config();
     let token_data = decode::<TokenClaims>(
         token,

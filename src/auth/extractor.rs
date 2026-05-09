@@ -3,8 +3,8 @@ use std::sync::Arc;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 
-use crate::app::error::AppError;
 use crate::app::AppState;
+use crate::app::error::AppError;
 use crate::auth::jwt::validate_access_token;
 
 /// Extracts and validates JWT from the `Authorization: Bearer <token>` header.

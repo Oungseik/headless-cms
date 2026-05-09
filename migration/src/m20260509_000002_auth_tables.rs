@@ -11,7 +11,12 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(User::Table)
-                    .add_column(ColumnDef::new(User::PasswordHash).text().not_null().default(""))
+                    .add_column(
+                        ColumnDef::new(User::PasswordHash)
+                            .text()
+                            .not_null()
+                            .default(""),
+                    )
                     .add_column(
                         ColumnDef::new(User::Role)
                             .text()
@@ -44,11 +49,7 @@ impl MigrationTrait for Migration {
                     .col(integer(RefreshToken::UserId))
                     .col(string_uniq(RefreshToken::TokenHash))
                     .col(timestamp(RefreshToken::ExpiresAt))
-                    .col(
-                        ColumnDef::new(RefreshToken::RevokedAt)
-                            .timestamp()
-                            .null(),
-                    )
+                    .col(ColumnDef::new(RefreshToken::RevokedAt).timestamp().null())
                     .col(
                         ColumnDef::new(RefreshToken::CreatedAt)
                             .timestamp()

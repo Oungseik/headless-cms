@@ -1,11 +1,9 @@
 use async_trait::async_trait;
-use bcrypt::{hash, verify, DEFAULT_COST};
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
-};
+use bcrypt::{DEFAULT_COST, hash, verify};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use sha2::{Digest, Sha256};
 
-use super::service::{AuthService, AuthServiceError, AuthResponse, RefreshResponse, UserResponse};
+use super::service::{AuthResponse, AuthService, AuthServiceError, RefreshResponse, UserResponse};
 use crate::auth::jwt;
 
 fn hash_token(token: &str) -> String {
@@ -40,8 +38,9 @@ impl AuthService for AuthServiceImpl {
             )));
         }
 
-        let password_hash = hash(&password, DEFAULT_COST)
-            .map_err(|_| AuthServiceError::Database(sea_orm::DbErr::Custom("password hashing failed".into())))?;
+        let password_hash = hash(&password, DEFAULT_COST).map_err(|_| {
+            AuthServiceError::Database(sea_orm::DbErr::Custom("password hashing failed".into()))
+        })?;
 
         let now = chrono::Utc::now().naive_utc();
 
@@ -70,8 +69,8 @@ impl AuthService for AuthServiceImpl {
 
         let token_hash = hash_token(&refresh_token);
         let config = crate::config::get_config();
-        let expires_at =
-            chrono::Utc::now().naive_utc() + chrono::Duration::seconds(config.refresh_token_ttl as i64);
+        let expires_at = chrono::Utc::now().naive_utc()
+            + chrono::Duration::seconds(config.refresh_token_ttl as i64);
 
         let rt_model = entity::refresh_token::ActiveModel {
             user_id: Set(user.id),
@@ -105,8 +104,8 @@ impl AuthService for AuthServiceImpl {
             .map_err(AuthServiceError::Database)?
             .ok_or(AuthServiceError::NotFound)?;
 
-        let valid = verify(&password, &user.password_hash)
-            .map_err(|_| AuthServiceError::Unauthorized)?;
+        let valid =
+            verify(&password, &user.password_hash).map_err(|_| AuthServiceError::Unauthorized)?;
         if !valid {
             return Err(AuthServiceError::Unauthorized);
         }
@@ -148,8 +147,8 @@ impl AuthService for AuthServiceImpl {
     }
 
     async fn refresh(&self, token: String) -> Result<RefreshResponse, AuthServiceError> {
-        let claims = jwt::validate_refresh_token(&token)
-            .map_err(|_| AuthServiceError::Unauthorized)?;
+        let claims =
+            jwt::validate_refresh_token(&token).map_err(|_| AuthServiceError::Unauthorized)?;
 
         let token_hash = hash_token(&token);
         let now = chrono::Utc::now().naive_utc();
@@ -221,8 +220,8 @@ impl AuthService for AuthServiceImpl {
     }
 
     async fn logout(&self, token: String) -> Result<(), AuthServiceError> {
-        let _claims = jwt::validate_refresh_token(&token)
-            .map_err(|_| AuthServiceError::Unauthorized)?;
+        let _claims =
+            jwt::validate_refresh_token(&token).map_err(|_| AuthServiceError::Unauthorized)?;
 
         let token_hash = hash_token(&token);
         let now = chrono::Utc::now().naive_utc();

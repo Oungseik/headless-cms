@@ -6,7 +6,7 @@ pub mod tests {
     use async_trait::async_trait;
 
     use crate::features::auth::service::{
-        AuthService, AuthServiceError, AuthResponse, RefreshResponse, UserResponse,
+        AuthResponse, AuthService, AuthServiceError, RefreshResponse, UserResponse,
     };
 
     #[derive(Debug)]
