@@ -6,6 +6,7 @@ use axum::{
 use serde::Serialize;
 use utoipa::ToSchema;
 
+use crate::features::auth::service::AuthServiceError;
 use crate::features::users::service::UserServiceError;
 
 /// use to generate open api schema
@@ -31,6 +32,20 @@ impl From<UserServiceError> for AppError {
         match err {
             UserServiceError::NotFound(_) => Self::NotFound,
             UserServiceError::Database(db_err) => {
+                tracing::error!(%db_err, "database error");
+                Self::InternalServerError
+            }
+        }
+    }
+}
+
+impl From<AuthServiceError> for AppError {
+    fn from(err: AuthServiceError) -> Self {
+        match err {
+            AuthServiceError::NotFound => Self::NotFound,
+            AuthServiceError::Unauthorized => Self::Unauthorized,
+            AuthServiceError::Conflict(msg) => Self::Conflict(msg),
+            AuthServiceError::Database(db_err) => {
                 tracing::error!(%db_err, "database error");
                 Self::InternalServerError
             }

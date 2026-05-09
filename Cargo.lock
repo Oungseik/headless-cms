@@ -2158,6 +2158,7 @@ dependencies = [
  "opentelemetry_sdk",
  "sea-orm",
  "serde",
+ "sha2",
  "tokio",
  "tower-http",
  "tracing",

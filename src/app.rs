@@ -15,6 +15,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::get_config;
 use crate::features;
+use crate::features::auth::service::AuthService;
 use crate::features::users::service::UserService;
 
 #[derive(OpenApi)]
@@ -42,12 +43,14 @@ impl Modify for SecurityAddon {
 #[derive(Clone)]
 pub struct AppState {
     pub user_service: Arc<dyn UserService>,
+    pub auth_service: Arc<dyn AuthService>,
 }
 
 impl std::fmt::Debug for AppState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AppState")
             .field("user_service", &"Arc<dyn UserService>")
+            .field("auth_service", &"Arc<dyn AuthService>")
             .finish()
     }
 }
@@ -59,15 +62,22 @@ pub async fn create_app() -> Result<Router, sea_orm::DbErr> {
 
     let db = setup_db().await?;
     let user_service: Arc<dyn UserService> =
-        Arc::new(crate::features::users::service_impl::UserServiceImpl { db });
-    let state = Arc::new(AppState { user_service });
+        Arc::new(crate::features::users::service_impl::UserServiceImpl { db: db.clone() });
+    let auth_service: Arc<dyn AuthService> =
+        Arc::new(crate::features::auth::service_impl::AuthServiceImpl { db });
+    let state = Arc::new(AppState {
+        user_service,
+        auth_service,
+    });
 
     let health_route = features::health::router();
     let users_route = features::users::router();
+    let auth_route = features::auth::router();
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/health", health_route)
         .nest("/api/v1/users", users_route)
+        .nest("/api/v1/auth", auth_route)
         .with_state(state)
         .split_for_parts();
 

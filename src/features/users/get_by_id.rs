@@ -62,17 +62,24 @@ mod tests {
     use axum::extract::{Path, State};
 
     use crate::app::AppState;
+    use crate::features::auth::service::AuthService;
+    use crate::features::auth::service_mock::tests::MockAuthService;
     use crate::features::users::service::UserService;
     use crate::features::users::service_mock::tests::MockUserService;
 
     #[tokio::test]
     async fn test_get_user_by_id_found() {
         let mock = MockUserService::new();
+        let now = chrono::Utc::now().naive_utc();
         let test_user = entity::user::Model {
             id: 1,
             username: "testuser".into(),
             email: "test@example.com".into(),
-            created_at: chrono::Utc::now().naive_utc(),
+            password_hash: String::new(),
+            role: "customer".into(),
+            is_active: true,
+            updated_at: now,
+            created_at: now,
         };
         mock.users
             .lock()
@@ -80,7 +87,11 @@ mod tests {
             .insert(1, test_user.clone());
 
         let mock: Arc<dyn UserService> = Arc::new(mock);
-        let state = Arc::new(AppState { user_service: mock });
+        let auth_service: Arc<dyn AuthService> = Arc::new(MockAuthService::new());
+        let state = Arc::new(AppState {
+            user_service: mock,
+            auth_service,
+        });
 
         let result = super::handler(State(state), Path(1)).await;
         let response = result.unwrap_or_else(|e| panic!("handler should return Ok: {e:?}"));
@@ -94,7 +105,11 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_by_id_not_found() {
         let mock: Arc<dyn UserService> = Arc::new(MockUserService::new());
-        let state = Arc::new(AppState { user_service: mock });
+        let auth_service: Arc<dyn AuthService> = Arc::new(MockAuthService::new());
+        let state = Arc::new(AppState {
+            user_service: mock,
+            auth_service,
+        });
 
         let result = super::handler(State(state), Path(999)).await;
         assert!(result.is_err());
