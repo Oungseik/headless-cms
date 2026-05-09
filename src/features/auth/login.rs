@@ -18,7 +18,7 @@ pub struct LoginRequest {
 
 #[utoipa::path(
     post,
-    path = "",
+    path = "/login",
     description = "Login with username and password",
     request_body = LoginRequest,
     responses(

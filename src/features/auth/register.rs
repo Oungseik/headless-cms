@@ -19,7 +19,7 @@ pub struct RegisterRequest {
 
 #[utoipa::path(
     post,
-    path = "",
+    path = "/register",
     description = "Register a new customer account",
     request_body = RegisterRequest,
     responses(

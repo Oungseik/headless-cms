@@ -21,7 +21,7 @@ pub struct LogoutResponse {
 
 #[utoipa::path(
     post,
-    path = "",
+    path = "/logout",
     description = "Logout by revoking the refresh token",
     request_body = LogoutRequest,
     responses(
