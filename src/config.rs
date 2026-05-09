@@ -10,7 +10,9 @@ pub struct Config {
 }
 
 pub fn get_config() -> &'static Config {
-    dotenv::dotenv().ok();
     static CONFIG: OnceLock<Config> = OnceLock::new();
-    CONFIG.get_or_init(Config::parse)
+    CONFIG.get_or_init(|| {
+        dotenv::dotenv().ok();
+        Config::parse()
+    })
 }

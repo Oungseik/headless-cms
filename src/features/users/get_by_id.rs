@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use axum::Json;
 use axum::extract::{Path, State};
+use chrono::NaiveDateTime;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -13,7 +14,7 @@ pub struct UserResponse {
     pub id: i32,
     pub username: String,
     pub email: String,
-    pub created_at: String,
+    pub created_at: NaiveDateTime,
 }
 
 impl From<entity::user::Model> for UserResponse {
@@ -22,7 +23,7 @@ impl From<entity::user::Model> for UserResponse {
             id: model.id,
             username: model.username,
             email: model.email,
-            created_at: model.created_at.to_string(),
+            created_at: model.created_at,
         }
     }
 }
@@ -72,16 +73,11 @@ mod tests {
             email: "test@example.com".into(),
             created_at: chrono::Utc::now().naive_utc(),
         };
-        mock.users.lock().unwrap().insert(1, test_user.clone());
+        mock.users.lock().expect("mock users mutex poisoned").insert(1, test_user.clone());
 
         let mock: Arc<dyn UserService> = Arc::new(mock);
-
-        let db = sea_orm::Database::connect("sqlite::memory:")
-            .await
-            .expect("failed to connect to test db");
         let state = Arc::new(AppState {
             user_service: mock,
-            db,
         });
 
         let result = super::handler(State(state), Path(1)).await;
@@ -96,12 +92,8 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_by_id_not_found() {
         let mock: Arc<dyn UserService> = Arc::new(MockUserService::new());
-        let db = sea_orm::Database::connect("sqlite::memory:")
-            .await
-            .expect("failed to connect to test db");
         let state = Arc::new(AppState {
             user_service: mock,
-            db,
         });
 
         let result = super::handler(State(state), Path(999)).await;

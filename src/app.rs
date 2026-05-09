@@ -42,14 +42,12 @@ impl Modify for SecurityAddon {
 #[derive(Clone)]
 pub struct AppState {
     pub user_service: Arc<dyn UserService>,
-    pub db: DatabaseConnection,
 }
 
 impl std::fmt::Debug for AppState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AppState")
             .field("user_service", &"Arc<dyn UserService>")
-            .field("db", &self.db)
             .finish()
     }
 }
@@ -61,8 +59,8 @@ pub async fn create_app() -> Result<Router, sea_orm::DbErr> {
 
     let db = setup_db().await?;
     let user_service: Arc<dyn UserService> =
-        Arc::new(crate::features::users::service_impl::UserServiceImpl { db: db.clone() });
-    let state = Arc::new(AppState { user_service, db });
+        Arc::new(crate::features::users::service_impl::UserServiceImpl { db });
+    let state = Arc::new(AppState { user_service });
 
     let health_route = features::health::router();
     let users_route = features::users::router();

@@ -26,7 +26,7 @@ src/features/<domain>/
   mod.rs           — pub fn router() -> OpenApiRouter<Arc<AppState>>
   service.rs       — #[async_trait] trait definition
   service_impl.rs  — production implementation (wraps DatabaseConnection)
-  mock_service.rs  — #[cfg(test)] mock with interior mutability
+  service_mock.rs  — #[cfg(test)] mock with interior mutability
   <operation>.rs   — one file per handler (e.g. get_by_id.rs, create.rs)
 ```
 
@@ -44,14 +44,19 @@ File: `src/features/<domain>/service.rs`
 
 ```rust
 use async_trait::async_trait;
-use sea_orm::DbErr;
+
+#[derive(Debug)]
+pub enum PostServiceError {
+    NotFound(i32),
+    Database(sea_orm::DbErr),
+}
 
 #[async_trait]
 pub trait PostService: Send + Sync + 'static {
     async fn get_by_id(
         &self,
         id: i32,
-    ) -> Result<Option<entity::post::Model>, DbErr>;
+    ) -> Result<Option<entity::post::Model>, PostServiceError>;
 }
 ```
 
@@ -65,7 +70,7 @@ File: `src/features/<domain>/service_impl.rs`
 use async_trait::async_trait;
 use sea_orm::{DatabaseConnection, EntityTrait};
 
-use super::service::PostService;
+use super::service::{PostService, PostServiceError};
 
 #[derive(Clone, Debug)]
 pub struct PostServiceImpl {
@@ -77,8 +82,11 @@ impl PostService for PostServiceImpl {
     async fn get_by_id(
         &self,
         id: i32,
-    ) -> Result<Option<entity::post::Model>, sea_orm::DbErr> {
-        entity::post::Entity::find_by_id(id).one(&self.db).await
+    ) -> Result<Option<entity::post::Model>, PostServiceError> {
+        entity::post::Entity::find_by_id(id)
+            .one(&self.db)
+            .await
+            .map_err(PostServiceError::Database)
     }
 }
 ```
@@ -92,9 +100,10 @@ File: `src/app.rs` — add to the struct and Debug impl:
 pub struct AppState {
     pub user_service: Arc<dyn UserService>,
     pub post_service: Arc<dyn PostService>,  // new
-    pub db: DatabaseConnection,
 }
 ```
+
+> **Note:** `DatabaseConnection` is NOT a field on `AppState`. It lives only inside each `*ServiceImpl`, which is constructed in `create_app()` and then erased behind `Arc<dyn <Domain>Service>`.
 
 Add the import at the top:
 
@@ -109,7 +118,7 @@ File: `src/app.rs` — construct the impl and pass to state:
 ```rust
 let post_service: Arc<dyn PostService> =
     Arc::new(crate::features::posts::service_impl::PostServiceImpl { db: db.clone() });
-let state = Arc::new(AppState { user_service, post_service, db });
+let state = Arc::new(AppState { user_service, post_service });
 ```
 
 ### 6. Create handler files
@@ -167,6 +176,8 @@ pub async fn handler(
 
 Every handler follows this shape: extract state/path/body, call service, map errors via `AppError::from` / `.ok_or(AppError::NotFound)`, return `AppResult<Json<T>>`.
 
+> **Note:** `AppError::from` works because `error.rs` contains a `From<PostServiceError> for AppError` impl. Add a matching `From` impl for each new domain error type.
+
 ### 7. Create the router
 
 File: `src/features/<domain>/mod.rs`
@@ -177,7 +188,7 @@ pub mod service;
 pub mod service_impl;
 
 #[cfg(test)]
-pub mod mock_service;
+pub mod service_mock;
 
 use std::sync::Arc;
 
@@ -207,17 +218,16 @@ let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
 
 ### 9. Create the mock service
 
-File: `src/features/<domain>/mock_service.rs`
+File: `src/features/<domain>/service_mock.rs`
 
 ```rust
 #[cfg(test)]
 pub mod tests {
     use async_trait::async_trait;
-    use sea_orm::DbErr;
     use std::collections::HashMap;
     use std::sync::Mutex;
 
-    use crate::features::posts::service::PostService;
+    use crate::features::posts::service::{PostService, PostServiceError};
 
     #[derive(Debug)]
     pub struct MockPostService {
@@ -235,7 +245,7 @@ pub mod tests {
         async fn get_by_id(
             &self,
             id: i32,
-        ) -> Result<Option<entity::post::Model>, DbErr> {
+        ) -> Result<Option<entity::post::Model>, PostServiceError> {
             let posts = self.posts.lock().unwrap();
             Ok(posts.get(&id).cloned())
         }
@@ -253,7 +263,7 @@ To add `create_post` to the posts domain:
 
 1. **Add method to service trait** (`service.rs`)
 2. **Implement in service_impl** (`service_impl.rs`)
-3. **Add method to mock** (`mock_service.rs`)
+3. **Add method to mock** (`service_mock.rs`)
 4. **Create handler file** (`create.rs`) with `UserResponse`/`PostResponse` or a new `<Operation>Response` type
 5. **Register in router** (`mod.rs`) — add `pub mod create;` and `.routes(routes!(create::handler))`
 6. **Add utoipa path annotation** with request body and response types
@@ -284,7 +294,7 @@ mod tests {
     use std::sync::Arc;
     use axum::extract::{Path, State};
     use crate::app::AppState;
-    use crate::features::users::mock_service::tests::MockUserService;
+    use crate::features::users::service_mock::tests::MockUserService;
     use crate::features::users::service::UserService;
 
     #[tokio::test]
@@ -296,9 +306,8 @@ mod tests {
         // 2. Wrap in Arc<dyn Trait>
         let mock: Arc<dyn UserService> = Arc::new(mock);
 
-        // 3. Create AppState with mock + in-memory DB
-        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
-        let state = Arc::new(AppState { user_service: mock, db });
+        // 3. Create AppState with mock
+        let state = Arc::new(AppState { user_service: mock });
 
         // 4. Call handler directly
         let result = super::handler(State(state), Path(1)).await;
@@ -312,7 +321,7 @@ mod tests {
 Key points:
 
 - Use `MockUserService` for unit tests — no real database needed
-- Use `"sqlite::memory:"` for the `db` field (required by AppState even when unused)
+- `AppState` has no `db` field; `DatabaseConnection` lives only inside `*ServiceImpl`
 - Call handlers as plain async functions: `super::handler(State(state), Path(id)).await`
 - The mock uses `Mutex<HashMap<K, V>>` for interior mutability without `mut`
 - For integration tests that need real DB behavior, test `service_impl` directly against a test database
@@ -332,7 +341,7 @@ When adding a new domain, verify every item:
 - [ ] Handler files created with `#[utoipa::path]` annotations
 - [ ] `router()` function defined in `mod.rs`
 - [ ] Route registered via `.nest("/api/v1/<domain>", <domain>_route)` in `create_app()`
-- [ ] Mock service created in `mock_service.rs` under `#[cfg(test)]`
+- [ ] Mock service created in `service_mock.rs` under `#[cfg(test)]`
 - [ ] Tests written inline in handler files
 
 ## Reference Files
