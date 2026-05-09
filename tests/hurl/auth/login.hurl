@@ -27,3 +27,17 @@ jsonpath "$.user.email" == "test@example.com"
 jsonpath "$.user.role" == "customer"
 jsonpath "$.accessToken" isString
 jsonpath "$.refreshToken" isString
+
+# 4. Get current user profile
+GET {{BASE_URL}}/api/v1/auth/me
+Authorization: Bearer {{access_token}}
+HTTP/1.1 200
+[Asserts]
+jsonpath "$.email" == "test@example.com"
+jsonpath "$.role" == "customer"
+jsonpath "$.isActive" == true
+jsonpath "$.emailVerifiedAt" exists
+jsonpath "$.id" isInteger
+jsonpath "$.createdAt" isString
+jsonpath "$.updatedAt" isString
+jsonpath "$.passwordHash" not exists
