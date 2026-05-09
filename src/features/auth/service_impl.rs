@@ -77,7 +77,7 @@ impl AuthService for AuthServiceImpl {
         let token_hash = hash_token(&raw_token);
         let now_with_tz = chrono::Utc::now().fixed_offset();
         let expires_at = now_with_tz
-            + chrono::Duration::seconds(self.config.email_verification_token_ttl as i64);
+            + chrono::Duration::seconds(self.config.email_verification_token_ttl.cast_signed());
 
         let verification_model = entity::email_verification_token::ActiveModel {
             user_id: Set(user.id),
@@ -148,7 +148,8 @@ impl AuthService for AuthServiceImpl {
 
         let token_hash = hash_token(&refresh_token);
         let now = chrono::Utc::now().naive_utc();
-        let expires_at = now + chrono::Duration::seconds(self.config.refresh_token_ttl as i64);
+        let expires_at =
+            now + chrono::Duration::seconds(self.config.refresh_token_ttl.cast_signed());
 
         let rt_model = entity::refresh_token::ActiveModel {
             user_id: Set(user.id),
@@ -234,9 +235,8 @@ impl AuthService for AuthServiceImpl {
             .await
             .map_err(AuthServiceError::Database)?;
 
-        let user = match user {
-            Some(u) => u,
-            None => return Ok(generic_message),
+        let Some(user) = user else {
+            return Ok(generic_message);
         };
 
         if user.email_verified_at.is_some() {
@@ -255,7 +255,7 @@ impl AuthService for AuthServiceImpl {
         let token_hash = hash_token(&raw_token);
         let now_with_tz = chrono::Utc::now().fixed_offset();
         let expires_at = now_with_tz
-            + chrono::Duration::seconds(self.config.email_verification_token_ttl as i64);
+            + chrono::Duration::seconds(self.config.email_verification_token_ttl.cast_signed());
 
         let verification_model = entity::email_verification_token::ActiveModel {
             user_id: Set(user.id),
@@ -342,7 +342,8 @@ impl AuthService for AuthServiceImpl {
         })?;
 
         let new_token_hash = hash_token(&new_refresh_token);
-        let expires_at = now + chrono::Duration::seconds(self.config.refresh_token_ttl as i64);
+        let expires_at =
+            now + chrono::Duration::seconds(self.config.refresh_token_ttl.cast_signed());
 
         let rt_model = entity::refresh_token::ActiveModel {
             user_id: Set(user.id),

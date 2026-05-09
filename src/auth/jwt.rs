@@ -34,7 +34,7 @@ pub fn generate_access_token(
         sub: user_id.to_string(),
         role: role.to_string(),
         iat: now.timestamp(),
-        exp: (now + Duration::seconds(config.access_token_ttl as i64)).timestamp(),
+        exp: (now + Duration::seconds(config.access_token_ttl.cast_signed())).timestamp(),
     };
     encode(
         &Header::default(),
@@ -50,7 +50,7 @@ pub fn generate_refresh_token(user_id: i32) -> Result<String, jsonwebtoken::erro
         sub: user_id.to_string(),
         typ: "refresh".to_string(),
         iat: now.timestamp(),
-        exp: (now + Duration::seconds(config.refresh_token_ttl as i64)).timestamp(),
+        exp: (now + Duration::seconds(config.refresh_token_ttl.cast_signed())).timestamp(),
     };
     encode(
         &Header::default(),
