@@ -1,0 +1,15 @@
+# Name of the session
+name: headless-cms
+tmux_socket: headless-cms
+on_create:
+on_stop:
+windows:
+  - editor:
+      panes:
+        - 
+  - server:
+      panes:
+        - 
+  - opencode:
+      panes:
+        - opencode
