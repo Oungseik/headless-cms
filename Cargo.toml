@@ -59,5 +59,8 @@ cargo = { level = "warn", priority = -1 }
 [lints]
 workspace = true
 
+[features]
+test = []
+
 [dev-dependencies]
 chrono = "0.4"

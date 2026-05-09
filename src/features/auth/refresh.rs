@@ -56,6 +56,7 @@ mod tests {
 
     fn setup_app_state(auth: Arc<dyn AuthService>) -> Arc<AppState> {
         Arc::new(AppState {
+            db: sea_orm::DatabaseConnection::default(),
             user_service: Arc::new(MockUserService::new()),
             auth_service: auth,
         })

@@ -88,6 +88,7 @@ mod tests {
         let mock: Arc<dyn UserService> = Arc::new(mock);
         let auth_service: Arc<dyn AuthService> = Arc::new(MockAuthService::new());
         let state = Arc::new(AppState {
+            db: sea_orm::DatabaseConnection::default(),
             user_service: mock,
             auth_service,
         });
@@ -105,6 +106,7 @@ mod tests {
         let mock: Arc<dyn UserService> = Arc::new(MockUserService::new());
         let auth_service: Arc<dyn AuthService> = Arc::new(MockAuthService::new());
         let state = Arc::new(AppState {
+            db: sea_orm::DatabaseConnection::default(),
             user_service: mock,
             auth_service,
         });

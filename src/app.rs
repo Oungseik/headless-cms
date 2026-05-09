@@ -43,6 +43,7 @@ impl Modify for SecurityAddon {
 
 #[derive(Clone)]
 pub struct AppState {
+    pub db: DatabaseConnection,
     pub user_service: Arc<dyn UserService>,
     pub auth_service: Arc<dyn AuthService>,
 }
@@ -50,6 +51,7 @@ pub struct AppState {
 impl std::fmt::Debug for AppState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AppState")
+            .field("db", &"DatabaseConnection")
             .field("user_service", &"Arc<dyn UserService>")
             .field("auth_service", &"Arc<dyn AuthService>")
             .finish()
@@ -68,11 +70,12 @@ pub async fn create_app() -> Result<Router, sea_orm::DbErr> {
     let email_service = Arc::new(ConsoleEmailService);
     let auth_service: Arc<dyn AuthService> =
         Arc::new(crate::features::auth::service_impl::AuthServiceImpl {
-            db,
+            db: db.clone(),
             email_service,
             config: Arc::new(config.clone()),
         });
     let state = Arc::new(AppState {
+        db,
         user_service,
         auth_service,
     });
