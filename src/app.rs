@@ -6,7 +6,7 @@ use axum::Router;
 use axum::http::Method;
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
 use migration::{Migrator, MigratorTrait};
-use sea_orm::{ConnectOptions, Database, DatabaseConnection};
+use sea_orm::{ConnectOptions, ConnectionTrait, Database, DatabaseConnection};
 use tower_http::cors::{Any, CorsLayer};
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
 use utoipa::{Modify, OpenApi};
@@ -85,6 +85,7 @@ pub async fn setup_db() -> Result<DatabaseConnection, sea_orm::DbErr> {
     let mut opt = ConnectOptions::new(get_config().database_url.as_str());
     opt.max_connections(5);
     let db = Database::connect(opt).await?;
+    db.execute_unprepared("PRAGMA journal_mode=WAL;").await?;
     Migrator::up(&db, None).await?;
     Ok(db)
 }

@@ -11,13 +11,19 @@ use crate::features::users::service::UserServiceError;
 /// use to generate open api schema
 #[derive(ToSchema, Serialize)]
 pub struct ErrorResponse {
-    message: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<String>,
 }
 
 #[derive(Debug)]
 pub enum AppError {
     InternalServerError,
     NotFound,
+    Unauthorized,
+    Forbidden,
+    BadRequest(String),
+    Conflict(String),
 }
 
 impl From<UserServiceError> for AppError {
@@ -41,6 +47,7 @@ impl IntoResponse for AppError {
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(ErrorResponse {
                         message: "Internal server error".into(),
+                        details: None,
                     }),
                 )
             }
@@ -48,6 +55,35 @@ impl IntoResponse for AppError {
                 StatusCode::NOT_FOUND,
                 Json(ErrorResponse {
                     message: "Not found".into(),
+                    details: None,
+                }),
+            ),
+            Self::Unauthorized => (
+                StatusCode::UNAUTHORIZED,
+                Json(ErrorResponse {
+                    message: "Unauthorized".into(),
+                    details: None,
+                }),
+            ),
+            Self::Forbidden => (
+                StatusCode::FORBIDDEN,
+                Json(ErrorResponse {
+                    message: "Forbidden".into(),
+                    details: None,
+                }),
+            ),
+            Self::BadRequest(msg) => (
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse {
+                    message: msg,
+                    details: None,
+                }),
+            ),
+            Self::Conflict(msg) => (
+                StatusCode::CONFLICT,
+                Json(ErrorResponse {
+                    message: msg,
+                    details: None,
                 }),
             ),
         }

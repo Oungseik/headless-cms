@@ -10,6 +10,7 @@ use crate::app::AppState;
 use crate::app::error::{AppError, AppResult, ErrorResponse};
 
 #[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct UserResponse {
     pub id: i32,
     pub username: String,

@@ -19,6 +19,55 @@ config → app → features → services → entities
 
 AppState holds `Arc<dyn <Domain>Service>` for each domain, enabling test-time substitution via mocks.
 
+## Money Handling Convention
+
+All monetary values are stored as **integer cents** (`i64`) in the database.
+
+| Layer | Representation | Example |
+|-------|---------------|---------|
+| **DB column** | `i64` with `_cents` suffix | `price_cents = 1299` |
+| **Entity model** | `i64` field | `pub price_cents: i64` |
+| **API response** | Decimal string via helper | `"12.99"` |
+| **Tax rates** | Basis points (`i64`) | `725` = 7.25% |
+
+Conversion happens at the handler boundary — services and entities work in cents only.
+
+Tax calculation: `tax_cents = (subtotal_cents * rate_basis_points) / 10_000`
+
+## Error Handling Convention
+
+`AppError` variants and their HTTP status codes:
+
+| Variant | Status | When |
+|---------|--------|------|
+| `BadRequest(String)` | 400 | Invalid input, validation failure |
+| `Unauthorized` | 401 | Missing or invalid JWT |
+| `Forbidden` | 403 | Valid JWT but wrong role |
+| `NotFound` | 404 | Resource not found |
+| `Conflict(String)` | 409 | Duplicate, already exists, state conflict |
+| `InternalServerError` | 500 | Database error, unexpected failure |
+
+Each domain defines its own `<Domain>ServiceError` enum with a `From<DomainServiceError> for AppError` impl in `error.rs`.
+
+## API Route Convention
+
+| Prefix | Auth | Purpose |
+|--------|------|---------|
+| `/health` | None | Health checks |
+| `/api/v1/auth/*` | None (login/register) or JWT (logout) | Authentication |
+| `/api/v1/admin/*` | JWT + admin role | Dashboard management |
+| `/api/v1/storefront/*` | Optional JWT (public browsing, auth for checkout) | Public storefront |
+
+Response types use `#[serde(rename_all = "camelCase")]` for JSON serialization.
+
+## Cross-Service Dependencies
+
+When a service needs another service (e.g., `OrderService` needs `ProductService`):
+
+- Services receive `Arc<dyn SiblingService>` in their constructor, NOT the entire `AppState`
+- This prevents circular dependencies and keeps testability clean
+- Example: `OrderServiceImpl { db, product_service: Arc<dyn ProductService>, tax_service: Arc<dyn TaxService> }`
+
 ## Feature Directory Structure
 
 ```
@@ -330,6 +379,9 @@ Key points:
 
 When adding a new domain, verify every item:
 
+- [ ] Money columns use `_cents` suffix with `i64` type
+- [ ] Response types include `#[serde(rename_all = "camelCase")]`
+- [ ] Route prefix follows API convention (`/admin/`, `/storefront/`, `/auth/`)
 - [ ] Entity created in `entity/` crate
 - [ ] Migration created in `migration/` crate
 - [ ] Service trait defined in `service.rs`
