@@ -28,6 +28,7 @@
             pkg-config
             openssl
             sqlite
+            just
           ];
 
           DATABASE_URL = "sqlite:./data.db?mode=rwc";
