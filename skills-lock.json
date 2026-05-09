@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "hurl": {
+      "source": "jyasuu/cheat-sheet",
+      "sourceType": "github",
+      "skillPath": "skills/hurl/SKILL.md",
+      "computedHash": "e162c7bd672b1c3868bd6f9ce1281fdad9f77b52f74146bbdcc56a564cc23264"
+    }
+  }
+}
