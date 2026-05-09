@@ -1,4 +1,7 @@
-use sea_orm_migration::{prelude::*, schema::*};
+use sea_orm_migration::{
+    prelude::*,
+    schema::{integer, pk_auto, string_uniq, timestamp},
+};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -114,9 +117,7 @@ async fn create_refresh_tokens_table(manager: &SchemaManager<'_>) -> Result<(), 
         .await
 }
 
-async fn create_email_verification_tokens_table(
-    manager: &SchemaManager<'_>,
-) -> Result<(), DbErr> {
+async fn create_email_verification_tokens_table(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
     manager
         .create_table(
             Table::create()
