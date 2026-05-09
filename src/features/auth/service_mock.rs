@@ -6,7 +6,7 @@ pub mod tests {
     use async_trait::async_trait;
 
     use crate::features::auth::service::{
-        AuthResponse, AuthService, AuthServiceError, RefreshResponse, RegisterResponse,
+        AuthResponse, AuthService, AuthServiceError, MeResponse, RefreshResponse, RegisterResponse,
         ResendVerificationResponse, UserResponse, VerifyEmailResponse,
     };
 
@@ -184,6 +184,15 @@ pub mod tests {
             let mut tokens = self.refresh_tokens.lock().expect("mutex poisoned");
             tokens.remove(&token_hash);
             Ok(())
+        }
+
+        async fn get_me(&self, user_id: i32) -> Result<MeResponse, AuthServiceError> {
+            let users = self.users.lock().expect("mutex poisoned");
+            let user = users
+                .values()
+                .find(|u| u.id == user_id)
+                .ok_or_else(|| AuthServiceError::Unauthorized("User not found".to_string()))?;
+            Ok(MeResponse::from(user.clone()))
         }
     }
 }

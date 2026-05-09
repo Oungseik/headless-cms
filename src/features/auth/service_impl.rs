@@ -10,7 +10,7 @@ use sha2::{Digest, Sha256};
 
 use super::email_service::EmailService;
 use super::service::{
-    AuthResponse, AuthService, AuthServiceError, RefreshResponse, RegisterResponse,
+    AuthResponse, AuthService, AuthServiceError, MeResponse, RefreshResponse, RegisterResponse,
     ResendVerificationResponse, UserResponse, VerifyEmailResponse,
 };
 use crate::auth::jwt;
@@ -390,5 +390,15 @@ impl AuthService for AuthServiceImpl {
             .map_err(AuthServiceError::Database)?;
 
         Ok(())
+    }
+
+    async fn get_me(&self, user_id: i32) -> Result<MeResponse, AuthServiceError> {
+        let user = entity::user::Entity::find_by_id(user_id)
+            .one(&self.db)
+            .await
+            .map_err(AuthServiceError::Database)?
+            .ok_or_else(|| AuthServiceError::Unauthorized("User not found".to_string()))?;
+
+        Ok(MeResponse::from(user))
     }
 }

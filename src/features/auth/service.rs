@@ -1,7 +1,8 @@
 use std::fmt;
 
 use async_trait::async_trait;
-use chrono::NaiveDateTime;
+use chrono::FixedOffset;
+use chrono::{DateTime, NaiveDateTime};
 
 #[derive(Debug)]
 pub enum AuthServiceError {
@@ -81,6 +82,32 @@ pub struct ResendVerificationResponse {
     pub message: String,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MeResponse {
+    pub id: i32,
+    pub email: String,
+    pub role: String,
+    pub is_active: bool,
+    pub email_verified_at: Option<DateTime<FixedOffset>>,
+    pub updated_at: NaiveDateTime,
+    pub created_at: NaiveDateTime,
+}
+
+impl From<entity::user::Model> for MeResponse {
+    fn from(m: entity::user::Model) -> Self {
+        Self {
+            id: m.id,
+            email: m.email,
+            role: m.role,
+            is_active: m.is_active,
+            email_verified_at: m.email_verified_at,
+            updated_at: m.updated_at,
+            created_at: m.created_at,
+        }
+    }
+}
+
 #[async_trait]
 pub trait AuthService: Send + Sync + 'static {
     async fn register(
@@ -97,4 +124,5 @@ pub trait AuthService: Send + Sync + 'static {
     ) -> Result<ResendVerificationResponse, AuthServiceError>;
     async fn refresh(&self, token: &str) -> Result<RefreshResponse, AuthServiceError>;
     async fn logout(&self, token: &str) -> Result<(), AuthServiceError>;
+    async fn get_me(&self, user_id: i32) -> Result<MeResponse, AuthServiceError>;
 }
