@@ -6,6 +6,12 @@
       "sourceType": "github",
       "skillPath": "skills/hurl/SKILL.md",
       "computedHash": "e162c7bd672b1c3868bd6f9ce1281fdad9f77b52f74146bbdcc56a564cc23264"
+    },
+    "rust-best-practices": {
+      "source": "apollographql/skills",
+      "sourceType": "github",
+      "skillPath": "skills/rust-best-practices/SKILL.md",
+      "computedHash": "fd336f2f772eb46ddf8658de5f9dd8faa1f35615b316665307fc82eeb4b2e658"
     }
   }
 }
