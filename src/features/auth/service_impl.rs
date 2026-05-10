@@ -104,12 +104,14 @@ impl AuthService for AuthServiceImpl {
         let (sql, values) = Query::insert()
             .into_table(EmailVerificationToken::Table)
             .columns([
+                EmailVerificationToken::Id,
                 EmailVerificationToken::UserId,
                 EmailVerificationToken::TokenHash,
                 EmailVerificationToken::ExpiresAt,
                 EmailVerificationToken::CreatedAt,
             ])
             .values_panic([
+                Uuid::now_v7().into(),
                 user_id.into(),
                 token_hash.into(),
                 expires_at.to_rfc3339().into(),
@@ -200,12 +202,14 @@ impl AuthService for AuthServiceImpl {
         let (sql, values) = Query::insert()
             .into_table(RefreshToken::Table)
             .columns([
+                RefreshToken::Id,
                 RefreshToken::UserId,
                 RefreshToken::TokenHash,
                 RefreshToken::ExpiresAt,
                 RefreshToken::CreatedAt,
             ])
             .values_panic([
+                Uuid::now_v7().into(),
                 user.id.into(),
                 token_hash.into(),
                 expires_at.to_string().into(),
@@ -383,12 +387,14 @@ impl AuthService for AuthServiceImpl {
         let (sql, values) = Query::insert()
             .into_table(EmailVerificationToken::Table)
             .columns([
+                EmailVerificationToken::Id,
                 EmailVerificationToken::UserId,
                 EmailVerificationToken::TokenHash,
                 EmailVerificationToken::ExpiresAt,
                 EmailVerificationToken::CreatedAt,
             ])
             .values_panic([
+                Uuid::now_v7().into(),
                 user.id.into(),
                 token_hash.into(),
                 expires_at.to_rfc3339().into(),
@@ -516,12 +522,14 @@ impl AuthService for AuthServiceImpl {
         let (sql, values) = Query::insert()
             .into_table(RefreshToken::Table)
             .columns([
+                RefreshToken::Id,
                 RefreshToken::UserId,
                 RefreshToken::TokenHash,
                 RefreshToken::ExpiresAt,
                 RefreshToken::CreatedAt,
             ])
             .values_panic([
+                Uuid::now_v7().into(),
                 user.id.into(),
                 new_token_hash.into(),
                 expires_at.to_string().into(),
