@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-sea-query = { version = "=1.0.0-rc.34", features = ["derive", "backend-sqlite", "with-uuid"] }
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "uuid"] }
-chrono = "0.4"
-serde = { version = "1", features = ["derive"] }
-uuid = { version = "1", features = ["serde", "v7"] }
+chrono = { workspace = true }
+sea-query = { workspace = true }
+serde = { workspace = true }
+sqlx = { workspace = true }
+uuid = { workspace = true }
 
 [lints]
 workspace = true

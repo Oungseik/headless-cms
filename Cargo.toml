@@ -10,6 +10,8 @@ resolver = "3"
 members = ["entity", "migration"]
 
 [workspace.dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4.6.1", features = ["derive", "env"] }
 sea-query = { version = "=1.0.0-rc.34", features = [
   "backend-sqlite",
   "derive",
@@ -19,20 +21,26 @@ sea-query-sqlx = { version = "=0.8.0-rc.16", features = [
   "sqlx-sqlite",
   "with-uuid",
 ] }
+serde = { version = "1.0.228", features = ["derive"] }
 sqlx = { version = "0.8", features = [
   "chrono",
   "runtime-tokio-rustls",
   "sqlite",
   "uuid",
 ] }
+tokio = { version = "1.52.1", features = ["macros", "rt-multi-thread", "signal"] }
+uuid = { version = "1", features = ["serde", "v7"] }
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
 cargo = { level = "warn", priority = -1 }
 cargo_common_metadata = "allow"
+large_enum_variant = "deny"
 multiple_crate_versions = "allow"
 nursery = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
+perf = { level = "warn", priority = -1 }
+redundant_clone = "deny"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -42,10 +50,11 @@ async-trait = "0.1.88"
 axum = { version = "0.8.9" }
 axum-tracing-opentelemetry = "0.33.1"
 bcrypt = "0.17"
-chrono = { version = "0.4", features = ["serde"] }
-clap = { version = "4.6.1", features = ["derive", "env"] }
-dotenv = "0.15.0"
+chrono = { workspace = true }
+clap = { workspace = true }
+dotenvy = "0.15"
 entity = { path = "entity" }
+hex = "0.4"
 jsonwebtoken = "9"
 migration = { path = "migration", optional = true }
 opentelemetry = "0.31.0"
@@ -54,14 +63,14 @@ opentelemetry-otlp = { version = "0.31.1", features = [
   "tokio",
 ] }
 opentelemetry_sdk = { version = "0.31.0", features = ["tokio"] }
+rand = "0.8"
 sea-query = { workspace = true }
 sea-query-sqlx = { workspace = true }
-serde = { version = "1.0.228", features = ["derive"] }
-rand = "0.8"
-hex = "0.4"
+serde = { workspace = true }
 sha2 = "0.10"
 sqlx = { workspace = true }
-tokio = { version = "1.52.1", features = ["macros", "rt-multi-thread", "signal"] }
+thiserror = "2"
+tokio = { workspace = true }
 tower-http = { version = "0.6.8", features = ["cors"] }
 tracing = "0.1.44"
 tracing-opentelemetry = "0.32.1"
@@ -69,10 +78,9 @@ tracing-subscriber = { version = "0.3.23", features = ["tracing"] }
 utoipa = { version = "5.4.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-axum = "0.2.0"
 utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
-uuid = { version = "1", features = ["serde", "v7"] }
+uuid = { workspace = true }
 
 [dev-dependencies]
-chrono = "0.4"
 
 [features]
 integration_testing = ["dep:migration"]

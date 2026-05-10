@@ -8,10 +8,10 @@ name = "migration"
 path = "src/main.rs"
 
 [dependencies]
+clap = { workspace = true }
 entity = { path = "../entity" }
-sea-query = { version = "=1.0.0-rc.34", features = ["backend-sqlite", "derive"] }
-clap = { version = "4", features = ["derive"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+sea-query = { workspace = true }
+tokio = { workspace = true }
 
 [lints]
 workspace = true
