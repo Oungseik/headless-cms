@@ -6,6 +6,7 @@ pub struct Migration {
     pub down: fn() -> Vec<String>,
 }
 
+#[must_use]
 pub fn migrations() -> Vec<Migration> {
     vec![Migration {
         name: "20260509_000001_initial_schema",
