@@ -1,31 +1,20 @@
-use sea_orm::entity::prelude::*;
-use serde::{Deserialize, Serialize};
+use sea_query::Iden;
 
-#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "email_verification_tokens")]
-pub struct Model {
-    #[sea_orm(primary_key)]
+#[derive(Iden)]
+pub enum EmailVerificationToken {
+    Table,
+    Id,
+    UserId,
+    TokenHash,
+    ExpiresAt,
+    CreatedAt,
+}
+
+#[derive(sqlx::FromRow, Debug, Clone)]
+pub struct EmailVerificationTokenRow {
     pub id: i32,
     pub user_id: i32,
     pub token_hash: String,
-    pub expires_at: DateTimeWithTimeZone,
-    pub created_at: DateTimeWithTimeZone,
+    pub expires_at: chrono::DateTime<chrono::FixedOffset>,
+    pub created_at: chrono::DateTime<chrono::FixedOffset>,
 }
-
-#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {
-    #[sea_orm(
-        belongs_to = "super::user::Entity",
-        from = "Column::UserId",
-        to = "super::user::Column::Id"
-    )]
-    User,
-}
-
-impl Related<super::user::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::User.def()
-    }
-}
-
-impl ActiveModelBehavior for ActiveModel {}

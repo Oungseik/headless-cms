@@ -1,187 +1,153 @@
-use sea_orm_migration::{
-    prelude::*,
-    schema::{integer, pk_auto, string_uniq, timestamp},
-};
+use sea_query::{ColumnDef, Expr, ForeignKey, ForeignKeyAction, Index, SqliteQueryBuilder, Table};
 
-#[derive(DeriveMigrationName)]
-pub struct Migration;
+use entity::email_verification_token::EmailVerificationToken;
+use entity::refresh_token::RefreshToken;
+use entity::user::User;
 
-#[async_trait::async_trait]
-impl MigrationTrait for Migration {
-    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        create_user_table(manager).await?;
-        create_refresh_tokens_table(manager).await?;
-        create_email_verification_tokens_table(manager).await?;
-
-        manager
-            .create_index(
-                Index::create()
-                    .name("idx_email_verification_tokens_user_id")
-                    .table(EmailVerificationTokens::Table)
-                    .col(EmailVerificationTokens::UserId)
-                    .to_owned(),
+pub fn up() -> Vec<String> {
+    vec![
+        // user table
+        Table::create()
+            .table(User::Table)
+            .if_not_exists()
+            .col(
+                ColumnDef::new(User::Id)
+                    .integer()
+                    .not_null()
+                    .auto_increment()
+                    .primary_key(),
             )
-            .await?;
-
-        Ok(())
-    }
-
-    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .drop_table(
-                Table::drop()
-                    .table(EmailVerificationTokens::Table)
-                    .to_owned(),
+            .col(ColumnDef::new(User::Email).string().not_null().unique_key())
+            .col(
+                ColumnDef::new(User::PasswordHash)
+                    .text()
+                    .not_null()
+                    .default(""),
             )
-            .await?;
-
-        manager
-            .drop_table(Table::drop().table(RefreshTokens::Table).to_owned())
-            .await?;
-
-        manager
-            .drop_table(Table::drop().table(User::Table).to_owned())
-            .await
-    }
+            .col(
+                ColumnDef::new(User::Role)
+                    .text()
+                    .not_null()
+                    .default("customer"),
+            )
+            .col(
+                ColumnDef::new(User::IsActive)
+                    .boolean()
+                    .not_null()
+                    .default(true),
+            )
+            .col(ColumnDef::new(User::EmailVerifiedAt).timestamp_with_time_zone())
+            .col(
+                ColumnDef::new(User::CreatedAt)
+                    .timestamp()
+                    .not_null()
+                    .default(Expr::current_timestamp()),
+            )
+            .col(
+                ColumnDef::new(User::UpdatedAt)
+                    .timestamp()
+                    .not_null()
+                    .default(Expr::current_timestamp()),
+            )
+            .build(SqliteQueryBuilder),
+        // refresh_tokens table
+        Table::create()
+            .table(RefreshToken::Table)
+            .if_not_exists()
+            .col(
+                ColumnDef::new(RefreshToken::Id)
+                    .integer()
+                    .not_null()
+                    .auto_increment()
+                    .primary_key(),
+            )
+            .col(ColumnDef::new(RefreshToken::UserId).integer().not_null())
+            .col(
+                ColumnDef::new(RefreshToken::TokenHash)
+                    .string()
+                    .not_null()
+                    .unique_key(),
+            )
+            .col(
+                ColumnDef::new(RefreshToken::ExpiresAt)
+                    .timestamp()
+                    .not_null(),
+            )
+            .col(ColumnDef::new(RefreshToken::RevokedAt).timestamp())
+            .col(
+                ColumnDef::new(RefreshToken::CreatedAt)
+                    .timestamp()
+                    .not_null()
+                    .default(Expr::current_timestamp()),
+            )
+            .foreign_key(
+                ForeignKey::create()
+                    .name("fk_refresh_tokens_user_id")
+                    .from(RefreshToken::Table, RefreshToken::UserId)
+                    .to(User::Table, User::Id),
+            )
+            .build(SqliteQueryBuilder),
+        // email_verification_tokens table
+        Table::create()
+            .table(EmailVerificationToken::Table)
+            .if_not_exists()
+            .col(
+                ColumnDef::new(EmailVerificationToken::Id)
+                    .integer()
+                    .not_null()
+                    .auto_increment()
+                    .primary_key(),
+            )
+            .col(
+                ColumnDef::new(EmailVerificationToken::UserId)
+                    .integer()
+                    .not_null(),
+            )
+            .col(
+                ColumnDef::new(EmailVerificationToken::TokenHash)
+                    .string()
+                    .not_null()
+                    .unique_key(),
+            )
+            .col(
+                ColumnDef::new(EmailVerificationToken::ExpiresAt)
+                    .timestamp_with_time_zone()
+                    .not_null(),
+            )
+            .col(
+                ColumnDef::new(EmailVerificationToken::CreatedAt)
+                    .timestamp_with_time_zone()
+                    .not_null()
+                    .default(Expr::current_timestamp()),
+            )
+            .foreign_key(
+                ForeignKey::create()
+                    .name("fk_email_verification_tokens_user_id")
+                    .from(
+                        EmailVerificationToken::Table,
+                        EmailVerificationToken::UserId,
+                    )
+                    .to(User::Table, User::Id)
+                    .on_delete(ForeignKeyAction::Cascade),
+            )
+            .build(SqliteQueryBuilder),
+        // index
+        Index::create()
+            .name("idx_email_verification_tokens_user_id")
+            .table(EmailVerificationToken::Table)
+            .col(EmailVerificationToken::UserId)
+            .build(SqliteQueryBuilder),
+    ]
 }
 
-async fn create_user_table(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
-    manager
-        .create_table(
-            Table::create()
-                .table(User::Table)
-                .if_not_exists()
-                .col(pk_auto(User::Id))
-                .col(string_uniq(User::Email))
-                .col(
-                    ColumnDef::new(User::PasswordHash)
-                        .text()
-                        .not_null()
-                        .default(""),
-                )
-                .col(
-                    ColumnDef::new(User::Role)
-                        .text()
-                        .not_null()
-                        .default("customer"),
-                )
-                .col(
-                    ColumnDef::new(User::IsActive)
-                        .boolean()
-                        .not_null()
-                        .default(true),
-                )
-                .col(ColumnDef::new(User::EmailVerifiedAt).timestamp_with_time_zone())
-                .col(
-                    ColumnDef::new(User::CreatedAt)
-                        .timestamp()
-                        .not_null()
-                        .default(Expr::current_timestamp()),
-                )
-                .col(
-                    ColumnDef::new(User::UpdatedAt)
-                        .timestamp()
-                        .not_null()
-                        .default(Expr::current_timestamp()),
-                )
-                .to_owned(),
-        )
-        .await
-}
-
-async fn create_refresh_tokens_table(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
-    manager
-        .create_table(
-            Table::create()
-                .table(RefreshTokens::Table)
-                .if_not_exists()
-                .col(pk_auto(RefreshTokens::Id))
-                .col(integer(RefreshTokens::UserId))
-                .col(string_uniq(RefreshTokens::TokenHash))
-                .col(timestamp(RefreshTokens::ExpiresAt))
-                .col(ColumnDef::new(RefreshTokens::RevokedAt).timestamp().null())
-                .col(
-                    ColumnDef::new(RefreshTokens::CreatedAt)
-                        .timestamp()
-                        .not_null()
-                        .default(Expr::current_timestamp()),
-                )
-                .foreign_key(
-                    ForeignKey::create()
-                        .name("fk_refresh_tokens_user_id")
-                        .from(RefreshTokens::Table, RefreshTokens::UserId)
-                        .to(User::Table, User::Id),
-                )
-                .to_owned(),
-        )
-        .await
-}
-
-async fn create_email_verification_tokens_table(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
-    manager
-        .create_table(
-            Table::create()
-                .table(EmailVerificationTokens::Table)
-                .if_not_exists()
-                .col(pk_auto(EmailVerificationTokens::Id))
-                .col(integer(EmailVerificationTokens::UserId))
-                .col(string_uniq(EmailVerificationTokens::TokenHash))
-                .col(
-                    ColumnDef::new(EmailVerificationTokens::ExpiresAt)
-                        .timestamp_with_time_zone()
-                        .not_null(),
-                )
-                .col(
-                    ColumnDef::new(EmailVerificationTokens::CreatedAt)
-                        .timestamp_with_time_zone()
-                        .not_null()
-                        .default(Expr::current_timestamp()),
-                )
-                .foreign_key(
-                    ForeignKey::create()
-                        .name("fk_email_verification_tokens_user_id")
-                        .from(
-                            EmailVerificationTokens::Table,
-                            EmailVerificationTokens::UserId,
-                        )
-                        .to(User::Table, User::Id)
-                        .on_delete(ForeignKeyAction::Cascade),
-                )
-                .to_owned(),
-        )
-        .await
-}
-
-#[derive(DeriveIden)]
-enum User {
-    Table,
-    Id,
-    Email,
-    PasswordHash,
-    Role,
-    IsActive,
-    EmailVerifiedAt,
-    CreatedAt,
-    UpdatedAt,
-}
-
-#[derive(DeriveIden)]
-enum RefreshTokens {
-    Table,
-    Id,
-    UserId,
-    TokenHash,
-    ExpiresAt,
-    RevokedAt,
-    CreatedAt,
-}
-
-#[derive(DeriveIden)]
-enum EmailVerificationTokens {
-    Table,
-    Id,
-    UserId,
-    TokenHash,
-    ExpiresAt,
-    CreatedAt,
+pub fn down() -> Vec<String> {
+    vec![
+        Table::drop()
+            .table(EmailVerificationToken::Table)
+            .build(SqliteQueryBuilder),
+        Table::drop()
+            .table(RefreshToken::Table)
+            .build(SqliteQueryBuilder),
+        Table::drop().table(User::Table).build(SqliteQueryBuilder),
+    ]
 }

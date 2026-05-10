@@ -5,8 +5,7 @@ use std::sync::Arc;
 use axum::Router;
 use axum::http::Method;
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
-use migration::{Migrator, MigratorTrait};
-use sea_orm::{ConnectOptions, ConnectionTrait, Database, DatabaseConnection};
+use sqlx::SqlitePool;
 use tower_http::cors::{Any, CorsLayer};
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
 use utoipa::{Modify, OpenApi};
@@ -43,7 +42,7 @@ impl Modify for SecurityAddon {
 
 #[derive(Clone)]
 pub struct AppState {
-    pub db: DatabaseConnection,
+    pub db: SqlitePool,
     pub user_service: Arc<dyn UserService>,
     pub auth_service: Arc<dyn AuthService>,
 }
@@ -51,14 +50,14 @@ pub struct AppState {
 impl std::fmt::Debug for AppState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AppState")
-            .field("db", &"DatabaseConnection")
+            .field("db", &"SqlitePool")
             .field("user_service", &"Arc<dyn UserService>")
             .field("auth_service", &"Arc<dyn AuthService>")
             .finish()
     }
 }
 
-pub async fn create_app() -> Result<Router, sea_orm::DbErr> {
+pub async fn create_app() -> Result<Router, sqlx::Error> {
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_origin(Any);
@@ -101,11 +100,10 @@ pub async fn create_app() -> Result<Router, sea_orm::DbErr> {
     Ok(router)
 }
 
-pub async fn setup_db() -> Result<DatabaseConnection, sea_orm::DbErr> {
-    let mut opt = ConnectOptions::new(get_config().database_url.as_str());
-    opt.max_connections(5);
-    let db = Database::connect(opt).await?;
-    db.execute_unprepared("PRAGMA journal_mode=WAL;").await?;
-    Migrator::up(&db, None).await?;
-    Ok(db)
+pub async fn setup_db() -> Result<SqlitePool, sqlx::Error> {
+    let pool = SqlitePool::connect(&get_config().database_url).await?;
+    sqlx::query("PRAGMA journal_mode=WAL;")
+        .execute(&pool)
+        .await?;
+    Ok(pool)
 }

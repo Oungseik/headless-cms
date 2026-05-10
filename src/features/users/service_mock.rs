@@ -8,7 +8,7 @@ pub mod tests {
 
     #[derive(Debug)]
     pub struct MockUserService {
-        pub users: Mutex<HashMap<i32, entity::user::Model>>,
+        pub users: Mutex<HashMap<i32, entity::user::UserRow>>,
     }
 
     impl MockUserService {
@@ -24,7 +24,7 @@ pub mod tests {
         async fn get_by_id(
             &self,
             id: i32,
-        ) -> Result<Option<entity::user::Model>, UserServiceError> {
+        ) -> Result<Option<entity::user::UserRow>, UserServiceError> {
             let users = self.users.lock().expect("mock users mutex poisoned");
             Ok(users.get(&id).cloned())
         }

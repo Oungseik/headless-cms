@@ -4,7 +4,7 @@ use std::fmt;
 #[derive(Debug)]
 pub enum UserServiceError {
     NotFound(i32),
-    Database(sea_orm::DbErr),
+    Database(sqlx::Error),
 }
 
 impl fmt::Display for UserServiceError {
@@ -20,5 +20,5 @@ impl std::error::Error for UserServiceError {}
 
 #[async_trait]
 pub trait UserService: Send + Sync + 'static {
-    async fn get_by_id(&self, id: i32) -> Result<Option<entity::user::Model>, UserServiceError>;
+    async fn get_by_id(&self, id: i32) -> Result<Option<entity::user::UserRow>, UserServiceError>;
 }

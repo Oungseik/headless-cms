@@ -1,43 +1,56 @@
-[workspace]
-members = [".", "entity", "migration"]
-resolver = "3"
-
-[workspace.dependencies]
-sea-orm = { version = "2.0.0-rc.38", features = [
-  "macros",
-  "with-chrono",
-  "runtime-tokio-rustls",
-  "sqlx-sqlite",
-] }
-
 [package]
 name = "pos-backend"
 version = "0.1.0"
 edition = "2024"
-description = "A headless POS + CMS backend built with Axum and SeaORM"
+description = "A headless POS + CMS backend built with Axum and SeaQuery + SQLx"
 repository = "https://github.com/oungseik/pos-backend"
+
+[workspace]
+resolver = "3"
+members = ["entity", "migration"]
+
+[workspace.dependencies]
+sea-query = { version = "=1.0.0-rc.34", features = [
+  "backend-sqlite",
+  "derive",
+] }
+sea-query-sqlx = { version = "=0.8.0-rc.16", features = ["sqlx-sqlite"] }
+sqlx = { version = "0.8", features = [
+  "chrono",
+  "runtime-tokio-rustls",
+  "sqlite",
+] }
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
 
 [dependencies]
 async-trait = "0.1.88"
 axum = { version = "0.8.9" }
-bcrypt = "0.17"
-chrono = "0.4"
-jsonwebtoken = "9"
-uuid = { version = "1", features = ["v4", "serde"] }
 axum-tracing-opentelemetry = "0.33.1"
+bcrypt = "0.17"
+chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.6.1", features = ["derive", "env"] }
 dotenv = "0.15.0"
 entity = { path = "entity" }
-migration = { path = "migration" }
+jsonwebtoken = "9"
 opentelemetry = "0.31.0"
 opentelemetry-otlp = { version = "0.31.1", features = [
   "http-proto",
   "tokio",
 ] }
 opentelemetry_sdk = { version = "0.31.0", features = ["tokio"] }
-sea-orm = { workspace = true }
+sea-query = { workspace = true }
+sea-query-sqlx = { workspace = true }
 serde = { version = "1.0.228", features = ["derive"] }
 sha2 = "0.10"
+sqlx = { workspace = true }
 tokio = { version = "1.52.1", features = ["macros", "rt-multi-thread", "signal"] }
 tower-http = { version = "0.6.8", features = ["cors"] }
 tracing = "0.1.44"
@@ -46,21 +59,13 @@ tracing-subscriber = { version = "0.3.23", features = ["tracing"] }
 utoipa = { version = "5.4.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-axum = "0.2.0"
 utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
+uuid = { version = "1", features = ["serde", "v4"] }
 
-[workspace.lints.rust]
-unsafe_code = "forbid"
-
-[workspace.lints.clippy]
-all = { level = "warn", priority = -1 }
-pedantic = { level = "warn", priority = -1 }
-nursery = { level = "warn", priority = -1 }
-cargo = { level = "warn", priority = -1 }
-
-[lints]
-workspace = true
+[dev-dependencies]
+chrono = "0.4"
 
 [features]
 test = []
 
-[dev-dependencies]
-chrono = "0.4"
+[lints]
+workspace = true

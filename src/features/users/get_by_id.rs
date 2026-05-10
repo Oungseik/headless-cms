@@ -17,8 +17,8 @@ pub struct UserResponse {
     pub created_at: NaiveDateTime,
 }
 
-impl From<entity::user::Model> for UserResponse {
-    fn from(model: entity::user::Model) -> Self {
+impl From<entity::user::UserRow> for UserResponse {
+    fn from(model: entity::user::UserRow) -> Self {
         Self {
             id: model.id,
             email: model.email,
@@ -70,7 +70,7 @@ mod tests {
     async fn test_get_user_by_id_found() {
         let mock = MockUserService::new();
         let now = chrono::Utc::now().naive_utc();
-        let test_user = entity::user::Model {
+        let test_user = entity::user::UserRow {
             id: 1,
             email: "test@example.com".into(),
             password_hash: String::new(),
@@ -88,7 +88,7 @@ mod tests {
         let mock: Arc<dyn UserService> = Arc::new(mock);
         let auth_service: Arc<dyn AuthService> = Arc::new(MockAuthService::new());
         let state = Arc::new(AppState {
-            db: sea_orm::DatabaseConnection::default(),
+            db: sqlx::SqlitePool::connect_lazy("sqlite::memory:").unwrap(),
             user_service: mock,
             auth_service,
         });
@@ -106,7 +106,7 @@ mod tests {
         let mock: Arc<dyn UserService> = Arc::new(MockUserService::new());
         let auth_service: Arc<dyn AuthService> = Arc::new(MockAuthService::new());
         let state = Arc::new(AppState {
-            db: sea_orm::DatabaseConnection::default(),
+            db: sqlx::SqlitePool::connect_lazy("sqlite::memory:").unwrap(),
             user_service: mock,
             auth_service,
         });

@@ -3,3 +3,6 @@
 /data
 
 .env
+
+# Generated migration SQL files (built from SeaQuery definitions)
+/migrations

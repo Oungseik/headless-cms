@@ -46,6 +46,10 @@ impl From<AuthServiceError> for AppError {
             AuthServiceError::Unauthorized(_) => Self::Unauthorized,
             AuthServiceError::NotVerified(msg) => Self::Forbidden(msg),
             AuthServiceError::Conflict(msg) => Self::Conflict(msg),
+            AuthServiceError::Internal(msg) => {
+                tracing::error!(%msg, "internal error");
+                Self::InternalServerError
+            }
             AuthServiceError::Database(db_err) => {
                 tracing::error!(%db_err, "database error");
                 Self::InternalServerError

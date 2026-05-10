@@ -10,7 +10,8 @@ pub enum AuthServiceError {
     Unauthorized(String),
     NotVerified(String),
     Conflict(String),
-    Database(sea_orm::DbErr),
+    Internal(String),
+    Database(sqlx::Error),
 }
 
 impl fmt::Display for AuthServiceError {
@@ -20,6 +21,7 @@ impl fmt::Display for AuthServiceError {
             Self::Unauthorized(msg) => write!(f, "unauthorized: {msg}"),
             Self::NotVerified(msg) => write!(f, "not verified: {msg}"),
             Self::Conflict(msg) => write!(f, "conflict: {msg}"),
+            Self::Internal(msg) => write!(f, "internal: {msg}"),
             Self::Database(err) => write!(f, "database error: {err}"),
         }
     }
@@ -37,8 +39,8 @@ pub struct UserResponse {
     pub created_at: NaiveDateTime,
 }
 
-impl From<entity::user::Model> for UserResponse {
-    fn from(m: entity::user::Model) -> Self {
+impl From<entity::user::UserRow> for UserResponse {
+    fn from(m: entity::user::UserRow) -> Self {
         Self {
             id: m.id,
             email: m.email,
@@ -94,8 +96,8 @@ pub struct MeResponse {
     pub created_at: NaiveDateTime,
 }
 
-impl From<entity::user::Model> for MeResponse {
-    fn from(m: entity::user::Model) -> Self {
+impl From<entity::user::UserRow> for MeResponse {
+    fn from(m: entity::user::UserRow) -> Self {
         Self {
             id: m.id,
             email: m.email,

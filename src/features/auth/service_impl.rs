@@ -2,11 +2,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bcrypt::{DEFAULT_COST, hash, verify};
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
-    TransactionTrait,
-};
+use sea_query::{Expr, ExprTrait, Query, SqliteQueryBuilder};
+use sea_query_sqlx::SqlxBinder;
 use sha2::{Digest, Sha256};
+use sqlx::SqlitePool;
 
 use super::email_service::EmailService;
 use super::service::{
@@ -24,7 +23,7 @@ fn hash_token(token: &str) -> String {
 
 #[derive(Clone, Debug)]
 pub struct AuthServiceImpl {
-    pub db: DatabaseConnection,
+    pub db: SqlitePool,
     pub email_service: Arc<dyn EmailService>,
     pub config: Arc<Config>,
 }
@@ -37,11 +36,20 @@ impl AuthService for AuthServiceImpl {
         password: &str,
         role: &str,
     ) -> Result<RegisterResponse, AuthServiceError> {
-        let txn = self.db.begin().await.map_err(AuthServiceError::Database)?;
+        use entity::email_verification_token::EmailVerificationToken;
+        use entity::user::User;
 
-        let existing = entity::user::Entity::find()
-            .filter(entity::user::Column::Email.eq(email))
-            .one(&txn)
+        let mut txn = self.db.begin().await.map_err(AuthServiceError::Database)?;
+
+        // Check existing user
+        let (sql, values) = Query::select()
+            .columns([User::Id])
+            .from(User::Table)
+            .and_where(Expr::col(User::Email).eq(email))
+            .build_sqlx(SqliteQueryBuilder);
+
+        let existing: Option<(i32,)> = sqlx::query_as_with(&sql, values)
+            .fetch_optional(&mut *txn)
             .await
             .map_err(AuthServiceError::Database)?;
 
@@ -51,43 +59,64 @@ impl AuthService for AuthServiceImpl {
             ));
         }
 
-        let password_hash = hash(password, DEFAULT_COST).map_err(|_| {
-            AuthServiceError::Database(sea_orm::DbErr::Custom("password hashing failed".into()))
-        })?;
+        let password_hash = hash(password, DEFAULT_COST)
+            .map_err(|_| AuthServiceError::Internal("password hashing failed".into()))?;
 
         let now = chrono::Utc::now().naive_utc();
 
-        let user_model = entity::user::ActiveModel {
-            email: Set(email.to_string()),
-            password_hash: Set(password_hash),
-            role: Set(role.to_string()),
-            is_active: Set(true),
-            email_verified_at: Set(None),
-            updated_at: Set(now),
-            created_at: Set(now),
-            ..Default::default()
-        };
+        // Insert user
+        let (sql, values) = Query::insert()
+            .into_table(User::Table)
+            .columns([
+                User::Email,
+                User::PasswordHash,
+                User::Role,
+                User::IsActive,
+                User::UpdatedAt,
+                User::CreatedAt,
+            ])
+            .values_panic([
+                email.into(),
+                password_hash.into(),
+                role.into(),
+                true.into(),
+                now.to_string().into(),
+                now.to_string().into(),
+            ])
+            .build_sqlx(SqliteQueryBuilder);
 
-        let user = user_model
-            .insert(&txn)
+        let res = sqlx::query_with(&sql, values)
+            .execute(&mut *txn)
             .await
             .map_err(AuthServiceError::Database)?;
 
+        let user_id: i32 = res.last_insert_rowid() as i32;
+
+        // Insert verification token
         let raw_token = uuid::Uuid::new_v4().to_string();
         let token_hash = hash_token(&raw_token);
         let now_with_tz = chrono::Utc::now().fixed_offset();
         let expires_at = now_with_tz
             + chrono::Duration::seconds(self.config.email_verification_token_ttl.cast_signed());
 
-        let verification_model = entity::email_verification_token::ActiveModel {
-            user_id: Set(user.id),
-            token_hash: Set(token_hash),
-            expires_at: Set(expires_at),
-            created_at: Set(now_with_tz),
-            ..Default::default()
-        };
-        verification_model
-            .insert(&txn)
+        let (sql, values) = Query::insert()
+            .into_table(EmailVerificationToken::Table)
+            .columns([
+                EmailVerificationToken::UserId,
+                EmailVerificationToken::TokenHash,
+                EmailVerificationToken::ExpiresAt,
+                EmailVerificationToken::CreatedAt,
+            ])
+            .values_panic([
+                user_id.into(),
+                token_hash.into(),
+                expires_at.to_rfc3339().into(),
+                now_with_tz.to_rfc3339().into(),
+            ])
+            .build_sqlx(SqliteQueryBuilder);
+
+        sqlx::query_with(&sql, values)
+            .execute(&mut *txn)
             .await
             .map_err(AuthServiceError::Database)?;
 
@@ -112,9 +141,26 @@ impl AuthService for AuthServiceImpl {
     }
 
     async fn login(&self, email: &str, password: &str) -> Result<AuthResponse, AuthServiceError> {
-        let user = entity::user::Entity::find()
-            .filter(entity::user::Column::Email.eq(email))
-            .one(&self.db)
+        use entity::refresh_token::RefreshToken;
+        use entity::user::{User, UserRow};
+
+        let (sql, values) = Query::select()
+            .columns([
+                User::Id,
+                User::Email,
+                User::PasswordHash,
+                User::Role,
+                User::IsActive,
+                User::EmailVerifiedAt,
+                User::CreatedAt,
+                User::UpdatedAt,
+            ])
+            .from(User::Table)
+            .and_where(Expr::col(User::Email).eq(email))
+            .build_sqlx(SqliteQueryBuilder);
+
+        let user = sqlx::query_as_with::<_, UserRow, _>(&sql, values)
+            .fetch_optional(&self.db)
             .await
             .map_err(AuthServiceError::Database)?
             .ok_or_else(|| AuthServiceError::NotFound("Invalid email or password".to_string()))?;
@@ -139,28 +185,34 @@ impl AuthService for AuthServiceImpl {
             ));
         }
 
-        let access_token = jwt::generate_access_token(user.id, &user.role).map_err(|_| {
-            AuthServiceError::Database(sea_orm::DbErr::Custom("token generation failed".into()))
-        })?;
-        let refresh_token = jwt::generate_refresh_token(user.id).map_err(|_| {
-            AuthServiceError::Database(sea_orm::DbErr::Custom("token generation failed".into()))
-        })?;
+        let access_token = jwt::generate_access_token(user.id, &user.role)
+            .map_err(|_| AuthServiceError::Internal("token generation failed".into()))?;
+        let refresh_token = jwt::generate_refresh_token(user.id)
+            .map_err(|_| AuthServiceError::Internal("token generation failed".into()))?;
 
         let token_hash = hash_token(&refresh_token);
         let now = chrono::Utc::now().naive_utc();
         let expires_at =
             now + chrono::Duration::seconds(self.config.refresh_token_ttl.cast_signed());
 
-        let rt_model = entity::refresh_token::ActiveModel {
-            user_id: Set(user.id),
-            token_hash: Set(token_hash),
-            expires_at: Set(expires_at),
-            revoked_at: Set(None),
-            created_at: Set(now),
-            ..Default::default()
-        };
-        rt_model
-            .insert(&self.db)
+        let (sql, values) = Query::insert()
+            .into_table(RefreshToken::Table)
+            .columns([
+                RefreshToken::UserId,
+                RefreshToken::TokenHash,
+                RefreshToken::ExpiresAt,
+                RefreshToken::CreatedAt,
+            ])
+            .values_panic([
+                user.id.into(),
+                token_hash.into(),
+                expires_at.to_string().into(),
+                now.to_string().into(),
+            ])
+            .build_sqlx(SqliteQueryBuilder);
+
+        sqlx::query_with(&sql, values)
+            .execute(&self.db)
             .await
             .map_err(AuthServiceError::Database)?;
 
@@ -172,45 +224,92 @@ impl AuthService for AuthServiceImpl {
     }
 
     async fn verify_email(&self, raw_token: &str) -> Result<VerifyEmailResponse, AuthServiceError> {
-        let txn = self.db.begin().await.map_err(AuthServiceError::Database)?;
+        use entity::email_verification_token::{EmailVerificationToken, EmailVerificationTokenRow};
+        use entity::user::{User, UserRow};
+
+        let mut txn = self.db.begin().await.map_err(AuthServiceError::Database)?;
 
         let token_hash = hash_token(raw_token);
 
-        let stored = entity::email_verification_token::Entity::find()
-            .filter(entity::email_verification_token::Column::TokenHash.eq(&token_hash))
-            .one(&txn)
+        // Find verification token
+        let (sql, values) = Query::select()
+            .columns([
+                EmailVerificationToken::Id,
+                EmailVerificationToken::UserId,
+                EmailVerificationToken::TokenHash,
+                EmailVerificationToken::ExpiresAt,
+                EmailVerificationToken::CreatedAt,
+            ])
+            .from(EmailVerificationToken::Table)
+            .and_where(Expr::col(EmailVerificationToken::TokenHash).eq(&token_hash))
+            .build_sqlx(SqliteQueryBuilder);
+
+        let stored = sqlx::query_as_with::<_, EmailVerificationTokenRow, _>(&sql, values)
+            .fetch_optional(&mut *txn)
             .await
             .map_err(AuthServiceError::Database)?
             .ok_or_else(|| AuthServiceError::NotFound("Invalid verification token".to_string()))?;
 
-        let now = chrono::Utc::now();
+        let now = chrono::Utc::now().fixed_offset();
         if stored.expires_at < now {
-            let active: entity::email_verification_token::ActiveModel = stored.into();
-            active
-                .delete(&txn)
+            // Delete expired token
+            let (sql, values) = Query::delete()
+                .from_table(EmailVerificationToken::Table)
+                .and_where(Expr::col(EmailVerificationToken::Id).eq(stored.id))
+                .build_sqlx(SqliteQueryBuilder);
+
+            sqlx::query_with(&sql, values)
+                .execute(&mut *txn)
                 .await
                 .map_err(AuthServiceError::Database)?;
+
             return Err(AuthServiceError::NotFound(
                 "Verification token expired. Please request a new one.".to_string(),
             ));
         }
 
-        let user = entity::user::Entity::find_by_id(stored.user_id)
-            .one(&txn)
+        // Find user
+        let (sql, values) = Query::select()
+            .columns([
+                User::Id,
+                User::Email,
+                User::PasswordHash,
+                User::Role,
+                User::IsActive,
+                User::EmailVerifiedAt,
+                User::CreatedAt,
+                User::UpdatedAt,
+            ])
+            .from(User::Table)
+            .and_where(Expr::col(User::Id).eq(stored.user_id))
+            .build_sqlx(SqliteQueryBuilder);
+
+        let _user = sqlx::query_as_with::<_, UserRow, _>(&sql, values)
+            .fetch_optional(&mut *txn)
             .await
             .map_err(AuthServiceError::Database)?
             .ok_or_else(|| AuthServiceError::NotFound("User not found".to_string()))?;
 
-        let mut user_active: entity::user::ActiveModel = user.into();
-        user_active.email_verified_at = Set(Some(now.into()));
-        user_active
-            .update(&txn)
+        // Update user email_verified_at
+        let (sql, values) = Query::update()
+            .table(User::Table)
+            .values([(User::EmailVerifiedAt, now.to_rfc3339().into())])
+            .and_where(Expr::col(User::Id).eq(stored.user_id))
+            .build_sqlx(SqliteQueryBuilder);
+
+        sqlx::query_with(&sql, values)
+            .execute(&mut *txn)
             .await
             .map_err(AuthServiceError::Database)?;
 
-        let token_active: entity::email_verification_token::ActiveModel = stored.into();
-        token_active
-            .delete(&txn)
+        // Delete verification token
+        let (sql, values) = Query::delete()
+            .from_table(EmailVerificationToken::Table)
+            .and_where(Expr::col(EmailVerificationToken::Id).eq(stored.id))
+            .build_sqlx(SqliteQueryBuilder);
+
+        sqlx::query_with(&sql, values)
+            .execute(&mut *txn)
             .await
             .map_err(AuthServiceError::Database)?;
 
@@ -225,13 +324,31 @@ impl AuthService for AuthServiceImpl {
         &self,
         email: &str,
     ) -> Result<ResendVerificationResponse, AuthServiceError> {
+        use entity::email_verification_token::EmailVerificationToken;
+        use entity::user::{User, UserRow};
+
         let generic_message = ResendVerificationResponse {
             message: "If an account with that email exists and is not yet verified, we've sent a verification email.".to_string(),
         };
 
-        let user = entity::user::Entity::find()
-            .filter(entity::user::Column::Email.eq(email))
-            .one(&self.db)
+        // Find user
+        let (sql, values) = Query::select()
+            .columns([
+                User::Id,
+                User::Email,
+                User::PasswordHash,
+                User::Role,
+                User::IsActive,
+                User::EmailVerifiedAt,
+                User::CreatedAt,
+                User::UpdatedAt,
+            ])
+            .from(User::Table)
+            .and_where(Expr::col(User::Email).eq(email))
+            .build_sqlx(SqliteQueryBuilder);
+
+        let user = sqlx::query_as_with::<_, UserRow, _>(&sql, values)
+            .fetch_optional(&self.db)
             .await
             .map_err(AuthServiceError::Database)?;
 
@@ -244,9 +361,13 @@ impl AuthService for AuthServiceImpl {
         }
 
         // Delete existing verification tokens
-        entity::email_verification_token::Entity::delete_many()
-            .filter(entity::email_verification_token::Column::UserId.eq(user.id))
-            .exec(&self.db)
+        let (sql, values) = Query::delete()
+            .from_table(EmailVerificationToken::Table)
+            .and_where(Expr::col(EmailVerificationToken::UserId).eq(user.id))
+            .build_sqlx(SqliteQueryBuilder);
+
+        sqlx::query_with(&sql, values)
+            .execute(&self.db)
             .await
             .map_err(AuthServiceError::Database)?;
 
@@ -257,15 +378,24 @@ impl AuthService for AuthServiceImpl {
         let expires_at = now_with_tz
             + chrono::Duration::seconds(self.config.email_verification_token_ttl.cast_signed());
 
-        let verification_model = entity::email_verification_token::ActiveModel {
-            user_id: Set(user.id),
-            token_hash: Set(token_hash),
-            expires_at: Set(expires_at),
-            created_at: Set(now_with_tz),
-            ..Default::default()
-        };
-        verification_model
-            .insert(&self.db)
+        let (sql, values) = Query::insert()
+            .into_table(EmailVerificationToken::Table)
+            .columns([
+                EmailVerificationToken::UserId,
+                EmailVerificationToken::TokenHash,
+                EmailVerificationToken::ExpiresAt,
+                EmailVerificationToken::CreatedAt,
+            ])
+            .values_panic([
+                user.id.into(),
+                token_hash.into(),
+                expires_at.to_rfc3339().into(),
+                now_with_tz.to_rfc3339().into(),
+            ])
+            .build_sqlx(SqliteQueryBuilder);
+
+        sqlx::query_with(&sql, values)
+            .execute(&self.db)
             .await
             .map_err(AuthServiceError::Database)?;
 
@@ -286,15 +416,31 @@ impl AuthService for AuthServiceImpl {
     }
 
     async fn refresh(&self, token: &str) -> Result<RefreshResponse, AuthServiceError> {
+        use entity::refresh_token::{RefreshToken, RefreshTokenRow};
+        use entity::user::{User, UserRow};
+
         let claims = jwt::validate_refresh_token(token)
             .map_err(|_| AuthServiceError::Unauthorized("Invalid refresh token".to_string()))?;
 
         let token_hash = hash_token(token);
         let now = chrono::Utc::now().naive_utc();
 
-        let stored = entity::refresh_token::Entity::find()
-            .filter(entity::refresh_token::Column::TokenHash.eq(&token_hash))
-            .one(&self.db)
+        // Find refresh token
+        let (sql, values) = Query::select()
+            .columns([
+                RefreshToken::Id,
+                RefreshToken::UserId,
+                RefreshToken::TokenHash,
+                RefreshToken::ExpiresAt,
+                RefreshToken::RevokedAt,
+                RefreshToken::CreatedAt,
+            ])
+            .from(RefreshToken::Table)
+            .and_where(Expr::col(RefreshToken::TokenHash).eq(&token_hash))
+            .build_sqlx(SqliteQueryBuilder);
+
+        let stored = sqlx::query_as_with::<_, RefreshTokenRow, _>(&sql, values)
+            .fetch_optional(&self.db)
             .await
             .map_err(AuthServiceError::Database)?
             .ok_or_else(|| AuthServiceError::Unauthorized("Invalid refresh token".to_string()))?;
@@ -311,19 +457,41 @@ impl AuthService for AuthServiceImpl {
             ));
         }
 
-        let mut active: entity::refresh_token::ActiveModel = stored.into();
-        active.revoked_at = Set(Some(now));
-        active
-            .update(&self.db)
+        // Revoke old token
+        let (sql, values) = Query::update()
+            .table(RefreshToken::Table)
+            .values([(RefreshToken::RevokedAt, now.to_string().into())])
+            .and_where(Expr::col(RefreshToken::Id).eq(stored.id))
+            .build_sqlx(SqliteQueryBuilder);
+
+        sqlx::query_with(&sql, values)
+            .execute(&self.db)
             .await
             .map_err(AuthServiceError::Database)?;
 
+        // Find user
         let user_id: i32 = claims
             .sub
             .parse()
             .map_err(|_| AuthServiceError::Unauthorized("Invalid token subject".to_string()))?;
-        let user = entity::user::Entity::find_by_id(user_id)
-            .one(&self.db)
+
+        let (sql, values) = Query::select()
+            .columns([
+                User::Id,
+                User::Email,
+                User::PasswordHash,
+                User::Role,
+                User::IsActive,
+                User::EmailVerifiedAt,
+                User::CreatedAt,
+                User::UpdatedAt,
+            ])
+            .from(User::Table)
+            .and_where(Expr::col(User::Id).eq(user_id))
+            .build_sqlx(SqliteQueryBuilder);
+
+        let user = sqlx::query_as_with::<_, UserRow, _>(&sql, values)
+            .fetch_optional(&self.db)
             .await
             .map_err(AuthServiceError::Database)?
             .ok_or_else(|| AuthServiceError::NotFound("User not found".to_string()))?;
@@ -334,27 +502,33 @@ impl AuthService for AuthServiceImpl {
             ));
         }
 
-        let access_token = jwt::generate_access_token(user.id, &user.role).map_err(|_| {
-            AuthServiceError::Database(sea_orm::DbErr::Custom("token generation failed".into()))
-        })?;
-        let new_refresh_token = jwt::generate_refresh_token(user.id).map_err(|_| {
-            AuthServiceError::Database(sea_orm::DbErr::Custom("token generation failed".into()))
-        })?;
+        let access_token = jwt::generate_access_token(user.id, &user.role)
+            .map_err(|_| AuthServiceError::Internal("token generation failed".into()))?;
+        let new_refresh_token = jwt::generate_refresh_token(user.id)
+            .map_err(|_| AuthServiceError::Internal("token generation failed".into()))?;
 
         let new_token_hash = hash_token(&new_refresh_token);
         let expires_at =
             now + chrono::Duration::seconds(self.config.refresh_token_ttl.cast_signed());
 
-        let rt_model = entity::refresh_token::ActiveModel {
-            user_id: Set(user.id),
-            token_hash: Set(new_token_hash),
-            expires_at: Set(expires_at),
-            revoked_at: Set(None),
-            created_at: Set(now),
-            ..Default::default()
-        };
-        rt_model
-            .insert(&self.db)
+        let (sql, values) = Query::insert()
+            .into_table(RefreshToken::Table)
+            .columns([
+                RefreshToken::UserId,
+                RefreshToken::TokenHash,
+                RefreshToken::ExpiresAt,
+                RefreshToken::CreatedAt,
+            ])
+            .values_panic([
+                user.id.into(),
+                new_token_hash.into(),
+                expires_at.to_string().into(),
+                now.to_string().into(),
+            ])
+            .build_sqlx(SqliteQueryBuilder);
+
+        sqlx::query_with(&sql, values)
+            .execute(&self.db)
             .await
             .map_err(AuthServiceError::Database)?;
 
@@ -365,15 +539,30 @@ impl AuthService for AuthServiceImpl {
     }
 
     async fn logout(&self, token: &str) -> Result<(), AuthServiceError> {
+        use entity::refresh_token::{RefreshToken, RefreshTokenRow};
+
         let _claims = jwt::validate_refresh_token(token)
             .map_err(|_| AuthServiceError::Unauthorized("Invalid refresh token".to_string()))?;
 
         let token_hash = hash_token(token);
         let now = chrono::Utc::now().naive_utc();
 
-        let stored = entity::refresh_token::Entity::find()
-            .filter(entity::refresh_token::Column::TokenHash.eq(&token_hash))
-            .one(&self.db)
+        // Find refresh token
+        let (sql, values) = Query::select()
+            .columns([
+                RefreshToken::Id,
+                RefreshToken::UserId,
+                RefreshToken::TokenHash,
+                RefreshToken::ExpiresAt,
+                RefreshToken::RevokedAt,
+                RefreshToken::CreatedAt,
+            ])
+            .from(RefreshToken::Table)
+            .and_where(Expr::col(RefreshToken::TokenHash).eq(&token_hash))
+            .build_sqlx(SqliteQueryBuilder);
+
+        let stored = sqlx::query_as_with::<_, RefreshTokenRow, _>(&sql, values)
+            .fetch_optional(&self.db)
             .await
             .map_err(AuthServiceError::Database)?
             .ok_or_else(|| AuthServiceError::Unauthorized("Invalid refresh token".to_string()))?;
@@ -382,10 +571,15 @@ impl AuthService for AuthServiceImpl {
             return Ok(());
         }
 
-        let mut active: entity::refresh_token::ActiveModel = stored.into();
-        active.revoked_at = Set(Some(now));
-        active
-            .update(&self.db)
+        // Revoke token
+        let (sql, values) = Query::update()
+            .table(RefreshToken::Table)
+            .values([(RefreshToken::RevokedAt, now.to_string().into())])
+            .and_where(Expr::col(RefreshToken::Id).eq(stored.id))
+            .build_sqlx(SqliteQueryBuilder);
+
+        sqlx::query_with(&sql, values)
+            .execute(&self.db)
             .await
             .map_err(AuthServiceError::Database)?;
 
@@ -393,8 +587,25 @@ impl AuthService for AuthServiceImpl {
     }
 
     async fn get_me(&self, user_id: i32) -> Result<MeResponse, AuthServiceError> {
-        let user = entity::user::Entity::find_by_id(user_id)
-            .one(&self.db)
+        use entity::user::{User, UserRow};
+
+        let (sql, values) = Query::select()
+            .columns([
+                User::Id,
+                User::Email,
+                User::PasswordHash,
+                User::Role,
+                User::IsActive,
+                User::EmailVerifiedAt,
+                User::CreatedAt,
+                User::UpdatedAt,
+            ])
+            .from(User::Table)
+            .and_where(Expr::col(User::Id).eq(user_id))
+            .build_sqlx(SqliteQueryBuilder);
+
+        let user = sqlx::query_as_with::<_, UserRow, _>(&sql, values)
+            .fetch_optional(&self.db)
             .await
             .map_err(AuthServiceError::Database)?
             .ok_or_else(|| AuthServiceError::Unauthorized("User not found".to_string()))?;

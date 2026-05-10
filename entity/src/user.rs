@@ -1,22 +1,26 @@
-use sea_orm::entity::prelude::*;
-use serde::{Deserialize, Serialize};
+use sea_query::Iden;
 
-#[sea_orm::model]
-#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "user")]
-pub struct Model {
-    #[sea_orm(primary_key)]
-    pub id: i32,
-    #[sea_orm(unique)]
-    pub email: String,
-    #[sea_orm(column_type = "Text")]
-    pub password_hash: String,
-    #[sea_orm(column_type = "Text")]
-    pub role: String,
-    pub is_active: bool,
-    pub email_verified_at: Option<DateTimeWithTimeZone>,
-    pub updated_at: DateTime,
-    pub created_at: DateTime,
+#[derive(Iden)]
+pub enum User {
+    Table,
+    Id,
+    Email,
+    PasswordHash,
+    Role,
+    IsActive,
+    EmailVerifiedAt,
+    CreatedAt,
+    UpdatedAt,
 }
 
-impl ActiveModelBehavior for ActiveModel {}
+#[derive(sqlx::FromRow, Debug, Clone)]
+pub struct UserRow {
+    pub id: i32,
+    pub email: String,
+    pub password_hash: String,
+    pub role: String,
+    pub is_active: bool,
+    pub email_verified_at: Option<chrono::DateTime<chrono::FixedOffset>>,
+    pub created_at: chrono::NaiveDateTime,
+    pub updated_at: chrono::NaiveDateTime,
+}

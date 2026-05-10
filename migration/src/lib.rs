@@ -1,11 +1,15 @@
-pub use sea_orm_migration::prelude::*;
-
 mod m20260509_000001_initial_schema;
 
-pub struct Migrator;
+pub struct Migration {
+    pub name: &'static str,
+    pub up: fn() -> Vec<String>,
+    pub down: fn() -> Vec<String>,
+}
 
-impl MigratorTrait for Migrator {
-    fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-        vec![Box::new(m20260509_000001_initial_schema::Migration)]
-    }
+pub fn migrations() -> Vec<Migration> {
+    vec![Migration {
+        name: "20260509_000001_initial_schema",
+        up: m20260509_000001_initial_schema::up,
+        down: m20260509_000001_initial_schema::down,
+    }]
 }

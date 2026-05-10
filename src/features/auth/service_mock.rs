@@ -12,7 +12,7 @@ pub mod tests {
 
     #[derive(Debug)]
     pub struct MockAuthService {
-        pub users: Mutex<HashMap<String, entity::user::Model>>,
+        pub users: Mutex<HashMap<String, entity::user::UserRow>>,
         pub refresh_tokens: Mutex<HashMap<String, i32>>,
         pub verified_emails: Mutex<HashSet<String>>,
         pub verification_tokens: Mutex<HashMap<String, String>>,
@@ -58,7 +58,7 @@ pub mod tests {
             *next_id += 1;
 
             let now = chrono::Utc::now().naive_utc();
-            let user = entity::user::Model {
+            let user = entity::user::UserRow {
                 id,
                 email: email.to_string(),
                 password_hash: format!("hashed_{password}"),
