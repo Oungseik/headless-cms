@@ -103,16 +103,14 @@ mod tests {
     use crate::app::AppState;
     use crate::app::error::AppError;
     use crate::auth::jwt::generate_access_token;
-    use crate::features::auth::service_mock::tests::MockAuthService;
-    use crate::features::users::service_mock::tests::MockUserService;
+    use crate::features::dashboard_auth::service_mock::MockDashboardAuthService;
 
     use super::{AdminUser, AuthUser, OptionalAuthUser};
 
     fn setup_state() -> Arc<AppState> {
         Arc::new(AppState {
             db: sqlx::SqlitePool::connect_lazy("sqlite::memory:").unwrap(),
-            user_service: Arc::new(MockUserService::new()),
-            auth_service: Arc::new(MockAuthService::new()),
+            dashboard_auth_service: Arc::new(MockDashboardAuthService::new()),
         })
     }
 

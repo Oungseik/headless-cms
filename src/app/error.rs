@@ -6,8 +6,7 @@ use axum::{
 use serde::Serialize;
 use utoipa::ToSchema;
 
-use crate::features::auth::service::AuthServiceError;
-use crate::features::users::service::UserServiceError;
+use crate::features::dashboard_auth::service::DashboardAuthServiceError;
 
 /// use to generate open api schema
 #[derive(ToSchema, Serialize)]
@@ -27,30 +26,19 @@ pub enum AppError {
     Conflict(String),
 }
 
-impl From<UserServiceError> for AppError {
-    fn from(err: UserServiceError) -> Self {
+impl From<DashboardAuthServiceError> for AppError {
+    fn from(err: DashboardAuthServiceError) -> Self {
         match err {
-            UserServiceError::NotFound(_) => Self::NotFound,
-            UserServiceError::Database(db_err) => {
-                tracing::error!(%db_err, "database error");
-                Self::InternalServerError
-            }
-        }
-    }
-}
-
-impl From<AuthServiceError> for AppError {
-    fn from(err: AuthServiceError) -> Self {
-        match err {
-            AuthServiceError::NotFound(_) => Self::NotFound,
-            AuthServiceError::Unauthorized(_) => Self::Unauthorized,
-            AuthServiceError::NotVerified(msg) => Self::Forbidden(msg),
-            AuthServiceError::Conflict(msg) => Self::Conflict(msg),
-            AuthServiceError::Internal(msg) => {
+            DashboardAuthServiceError::NotFound(_) => Self::NotFound,
+            DashboardAuthServiceError::Unauthorized(_) => Self::Unauthorized,
+            DashboardAuthServiceError::NotVerified(msg) => Self::Forbidden(msg),
+            DashboardAuthServiceError::Conflict(msg) => Self::Conflict(msg),
+            DashboardAuthServiceError::BadRequest(msg) => Self::BadRequest(msg),
+            DashboardAuthServiceError::Internal(msg) => {
                 tracing::error!(%msg, "internal error");
                 Self::InternalServerError
             }
-            AuthServiceError::Database(db_err) => {
+            DashboardAuthServiceError::Database(db_err) => {
                 tracing::error!(%db_err, "database error");
                 Self::InternalServerError
             }

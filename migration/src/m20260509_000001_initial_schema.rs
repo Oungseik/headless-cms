@@ -1,157 +1,172 @@
 use sea_query::{ColumnDef, Expr, ForeignKey, ForeignKeyAction, Index, SqliteQueryBuilder, Table};
 
-use entity::email_verification_token::EmailVerificationToken;
-use entity::refresh_token::RefreshToken;
-use entity::user::User;
+use entity::employee::Employee;
+use entity::employee_email_verification_token::EmployeeEmailVerificationToken;
+use entity::employee_refresh_token::EmployeeRefreshToken;
 
-fn create_user_table() -> String {
+fn create_employee_table() -> String {
     Table::create()
-        .table(User::Table)
+        .table(Employee::Table)
         .if_not_exists()
-        .col(ColumnDef::new(User::Id).text().not_null().primary_key())
-        .col(ColumnDef::new(User::Email).string().not_null().unique_key())
+        .col(ColumnDef::new(Employee::Id).text().not_null().primary_key())
         .col(
-            ColumnDef::new(User::PasswordHash)
+            ColumnDef::new(Employee::Email)
+                .string()
+                .not_null()
+                .unique_key(),
+        )
+        .col(
+            ColumnDef::new(Employee::PasswordHash)
                 .text()
                 .not_null()
                 .default(""),
         )
         .col(
-            ColumnDef::new(User::Role)
+            ColumnDef::new(Employee::Role)
                 .text()
                 .not_null()
-                .default("customer"),
+                .default("owner"),
         )
         .col(
-            ColumnDef::new(User::IsActive)
+            ColumnDef::new(Employee::IsActive)
                 .boolean()
                 .not_null()
                 .default(true),
         )
-        .col(ColumnDef::new(User::EmailVerifiedAt).timestamp_with_time_zone())
+        .col(ColumnDef::new(Employee::EmailVerifiedAt).timestamp_with_time_zone())
         .col(
-            ColumnDef::new(User::CreatedAt)
-                .timestamp()
+            ColumnDef::new(Employee::CreatedAt)
+                .timestamp_with_time_zone()
                 .not_null()
                 .default(Expr::current_timestamp()),
         )
         .col(
-            ColumnDef::new(User::UpdatedAt)
-                .timestamp()
+            ColumnDef::new(Employee::UpdatedAt)
+                .timestamp_with_time_zone()
                 .not_null()
                 .default(Expr::current_timestamp()),
         )
         .build(SqliteQueryBuilder)
 }
 
-fn create_refresh_tokens_table() -> String {
+fn create_employee_refresh_tokens_table() -> String {
     Table::create()
-        .table(RefreshToken::Table)
+        .table(EmployeeRefreshToken::Table)
         .if_not_exists()
         .col(
-            ColumnDef::new(RefreshToken::Id)
-                .text()
-                .not_null()
-                .primary_key(),
-        )
-        .col(ColumnDef::new(RefreshToken::UserId).text().not_null())
-        .col(
-            ColumnDef::new(RefreshToken::TokenHash)
-                .string()
-                .not_null()
-                .unique_key(),
-        )
-        .col(
-            ColumnDef::new(RefreshToken::ExpiresAt)
-                .timestamp()
-                .not_null(),
-        )
-        .col(ColumnDef::new(RefreshToken::RevokedAt).timestamp())
-        .col(
-            ColumnDef::new(RefreshToken::CreatedAt)
-                .timestamp()
-                .not_null()
-                .default(Expr::current_timestamp()),
-        )
-        .foreign_key(
-            ForeignKey::create()
-                .name("fk_refresh_tokens_user_id")
-                .from(RefreshToken::Table, RefreshToken::UserId)
-                .to(User::Table, User::Id),
-        )
-        .build(SqliteQueryBuilder)
-}
-
-fn create_email_verification_tokens_table() -> String {
-    Table::create()
-        .table(EmailVerificationToken::Table)
-        .if_not_exists()
-        .col(
-            ColumnDef::new(EmailVerificationToken::Id)
+            ColumnDef::new(EmployeeRefreshToken::Id)
                 .text()
                 .not_null()
                 .primary_key(),
         )
         .col(
-            ColumnDef::new(EmailVerificationToken::UserId)
+            ColumnDef::new(EmployeeRefreshToken::EmployeeId)
                 .text()
                 .not_null(),
         )
         .col(
-            ColumnDef::new(EmailVerificationToken::TokenHash)
+            ColumnDef::new(EmployeeRefreshToken::TokenHash)
                 .string()
                 .not_null()
                 .unique_key(),
         )
         .col(
-            ColumnDef::new(EmailVerificationToken::ExpiresAt)
+            ColumnDef::new(EmployeeRefreshToken::ExpiresAt)
                 .timestamp_with_time_zone()
                 .not_null(),
         )
+        .col(ColumnDef::new(EmployeeRefreshToken::RevokedAt).timestamp_with_time_zone())
         .col(
-            ColumnDef::new(EmailVerificationToken::CreatedAt)
+            ColumnDef::new(EmployeeRefreshToken::CreatedAt)
                 .timestamp_with_time_zone()
                 .not_null()
                 .default(Expr::current_timestamp()),
         )
         .foreign_key(
             ForeignKey::create()
-                .name("fk_email_verification_tokens_user_id")
+                .name("fk_employee_refresh_tokens_employee_id")
                 .from(
-                    EmailVerificationToken::Table,
-                    EmailVerificationToken::UserId,
+                    EmployeeRefreshToken::Table,
+                    EmployeeRefreshToken::EmployeeId,
                 )
-                .to(User::Table, User::Id)
+                .to(Employee::Table, Employee::Id)
                 .on_delete(ForeignKeyAction::Cascade),
         )
         .build(SqliteQueryBuilder)
 }
 
-fn create_email_verification_tokens_index() -> String {
+fn create_employee_email_verification_tokens_table() -> String {
+    Table::create()
+        .table(EmployeeEmailVerificationToken::Table)
+        .if_not_exists()
+        .col(
+            ColumnDef::new(EmployeeEmailVerificationToken::Id)
+                .text()
+                .not_null()
+                .primary_key(),
+        )
+        .col(
+            ColumnDef::new(EmployeeEmailVerificationToken::EmployeeId)
+                .text()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(EmployeeEmailVerificationToken::TokenHash)
+                .string()
+                .not_null()
+                .unique_key(),
+        )
+        .col(
+            ColumnDef::new(EmployeeEmailVerificationToken::ExpiresAt)
+                .timestamp_with_time_zone()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(EmployeeEmailVerificationToken::CreatedAt)
+                .timestamp_with_time_zone()
+                .not_null()
+                .default(Expr::current_timestamp()),
+        )
+        .foreign_key(
+            ForeignKey::create()
+                .name("fk_employee_email_verification_tokens_employee_id")
+                .from(
+                    EmployeeEmailVerificationToken::Table,
+                    EmployeeEmailVerificationToken::EmployeeId,
+                )
+                .to(Employee::Table, Employee::Id)
+                .on_delete(ForeignKeyAction::Cascade),
+        )
+        .build(SqliteQueryBuilder)
+}
+
+fn create_employee_email_verification_tokens_index() -> String {
     Index::create()
-        .name("idx_email_verification_tokens_user_id")
-        .table(EmailVerificationToken::Table)
-        .col(EmailVerificationToken::UserId)
+        .name("idx_employee_email_verification_tokens_employee_id")
+        .table(EmployeeEmailVerificationToken::Table)
+        .col(EmployeeEmailVerificationToken::EmployeeId)
         .build(SqliteQueryBuilder)
 }
 
 pub fn up() -> Vec<String> {
     vec![
-        create_user_table(),
-        create_refresh_tokens_table(),
-        create_email_verification_tokens_table(),
-        create_email_verification_tokens_index(),
+        create_employee_table(),
+        create_employee_refresh_tokens_table(),
+        create_employee_email_verification_tokens_table(),
+        create_employee_email_verification_tokens_index(),
     ]
 }
 
 pub fn down() -> Vec<String> {
     vec![
         Table::drop()
-            .table(EmailVerificationToken::Table)
+            .table(EmployeeEmailVerificationToken::Table)
             .build(SqliteQueryBuilder),
         Table::drop()
-            .table(RefreshToken::Table)
+            .table(EmployeeRefreshToken::Table)
             .build(SqliteQueryBuilder),
-        Table::drop().table(User::Table).build(SqliteQueryBuilder),
+        Table::drop()
+            .table(Employee::Table)
+            .build(SqliteQueryBuilder),
     ]
 }

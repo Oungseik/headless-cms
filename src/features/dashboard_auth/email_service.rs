@@ -9,7 +9,7 @@ pub trait EmailService: Send + Sync + std::fmt::Debug {
     ) -> Result<(), String>;
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ConsoleEmailService;
 
 #[async_trait]
@@ -19,8 +19,10 @@ impl EmailService for ConsoleEmailService {
         to: &str,
         verification_link: &str,
     ) -> Result<(), String> {
-        println!("[Email Service] Sending verification email to: {to}");
-        println!("[Email Service] Verification link: {verification_link}");
+        println!(
+            "[EMAIL] To: {}\n[EMAIL] Verification link: {}\n",
+            to, verification_link
+        );
         Ok(())
     }
 }

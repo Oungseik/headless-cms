@@ -15,8 +15,12 @@ pub struct Config {
     pub refresh_token_ttl: u64,
     #[clap(long, env, default_value = "http://localhost:3000")]
     pub base_url: String,
+    #[clap(long, env, default_value = "http://localhost:3000")]
+    pub allowed_origins: String,
     #[clap(long, env, default_value_t = 86400)]
     pub email_verification_token_ttl: u64,
+    #[clap(long, env, default_value_t = 12)]
+    pub bcrypt_cost: u32,
 }
 
 impl std::fmt::Debug for Config {
@@ -32,6 +36,7 @@ impl std::fmt::Debug for Config {
                 "email_verification_token_ttl",
                 &self.email_verification_token_ttl,
             )
+            .field("bcrypt_cost", &self.bcrypt_cost)
             .finish()
     }
 }

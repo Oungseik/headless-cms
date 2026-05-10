@@ -16,14 +16,14 @@ pub struct VerifyAllResponse {
 
 #[tracing::instrument]
 pub async fn handler(State(state): State<Arc<AppState>>) -> AppResult<Json<VerifyAllResponse>> {
-    use entity::user::User;
+    use entity::employee::Employee;
 
     let now = chrono::Utc::now().fixed_offset();
 
     let (sql, values) = Query::update()
-        .table(User::Table)
-        .values([(User::EmailVerifiedAt, now.to_rfc3339().into())])
-        .and_where(Expr::col(User::EmailVerifiedAt).is_null())
+        .table(Employee::Table)
+        .values([(Employee::EmailVerifiedAt, now.to_rfc3339().into())])
+        .and_where(Expr::col(Employee::EmailVerifiedAt).is_null())
         .build_sqlx(SqliteQueryBuilder);
 
     sqlx::query_with(&sql, values)
@@ -32,6 +32,6 @@ pub async fn handler(State(state): State<Arc<AppState>>) -> AppResult<Json<Verif
         .map_err(|_| AppError::InternalServerError)?;
 
     Ok(Json(VerifyAllResponse {
-        message: "All users verified".to_string(),
+        message: "All employees verified".to_string(),
     }))
 }

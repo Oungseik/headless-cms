@@ -3,10 +3,10 @@ pub mod error;
 use std::sync::Arc;
 
 use axum::Router;
-use axum::http::Method;
+use axum::http::{HeaderValue, Method};
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
 use sqlx::SqlitePool;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 use utoipa_axum::router::OpenApiRouter;
@@ -14,12 +14,11 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::get_config;
 use crate::features;
-use crate::features::auth::email_service::ConsoleEmailService;
-use crate::features::auth::service::AuthService;
-use crate::features::users::service::UserService;
+use crate::features::dashboard_auth::email_service::ConsoleEmailService;
+use crate::features::dashboard_auth::service::DashboardAuthService;
 
 #[derive(OpenApi)]
-#[openapi( modifiers(&SecurityAddon))]
+#[openapi(modifiers(&SecurityAddon))]
 pub struct ApiDoc;
 
 pub struct SecurityAddon;
@@ -31,11 +30,6 @@ impl Modify for SecurityAddon {
                 "Authorization",
                 SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("Authorization"))),
             );
-
-            component.add_security_scheme(
-                "auth_token",
-                SecurityScheme::ApiKey(ApiKey::Cookie(ApiKeyValue::new("auth_token"))),
-            );
         }
     }
 }
@@ -43,50 +37,52 @@ impl Modify for SecurityAddon {
 #[derive(Clone)]
 pub struct AppState {
     pub db: SqlitePool,
-    pub user_service: Arc<dyn UserService>,
-    pub auth_service: Arc<dyn AuthService>,
+    pub dashboard_auth_service: Arc<dyn DashboardAuthService>,
 }
 
 impl std::fmt::Debug for AppState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AppState")
             .field("db", &"SqlitePool")
-            .field("user_service", &"Arc<dyn UserService>")
-            .field("auth_service", &"Arc<dyn AuthService>")
+            .field("dashboard_auth_service", &"Arc<dyn DashboardAuthService>")
             .finish()
     }
 }
 
 pub async fn create_app() -> Result<Router, sqlx::Error> {
+    let config = get_config();
+    let cors_origins: Vec<_> = config
+        .allowed_origins
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| HeaderValue::from_str(s).expect("invalid origin in ALLOWED_ORIGINS"))
+        .collect();
+
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
-        .allow_origin(Any);
+        .allow_origin(cors_origins);
 
     let db = setup_db().await?;
-    let config = get_config();
-    let user_service: Arc<dyn UserService> =
-        Arc::new(crate::features::users::service_impl::UserServiceImpl { db: db.clone() });
     let email_service = Arc::new(ConsoleEmailService);
-    let auth_service: Arc<dyn AuthService> =
-        Arc::new(crate::features::auth::service_impl::AuthServiceImpl {
+    let dashboard_auth_service: Arc<dyn DashboardAuthService> = Arc::new(
+        crate::features::dashboard_auth::service_impl::DashboardAuthServiceImpl {
             db: db.clone(),
             email_service,
             config: Arc::new(config.clone()),
-        });
+        },
+    );
     let state = Arc::new(AppState {
         db,
-        user_service,
-        auth_service,
+        dashboard_auth_service,
     });
 
     let health_route = features::health::router();
-    let users_route = features::users::router();
-    let auth_route = features::auth::router();
+    let dashboard_auth_route = features::dashboard_auth::router();
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/health", health_route)
-        .nest("/api/v1/users", users_route)
-        .nest("/api/v1/auth", auth_route)
+        .nest("/api/v1/dashboard/auth", dashboard_auth_route)
         .with_state(state)
         .split_for_parts();
 

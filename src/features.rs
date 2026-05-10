@@ -1,3 +1,2 @@
-pub mod auth;
+pub mod dashboard_auth;
 pub mod health;
-pub mod users;

@@ -1,3 +1,3 @@
-pub mod email_verification_token;
-pub mod refresh_token;
-pub mod user;
+pub mod employee;
+pub mod employee_email_verification_token;
+pub mod employee_refresh_token;
