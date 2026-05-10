@@ -1,11 +1,8 @@
-pub mod error;
-
 use std::sync::Arc;
 
 use axum::Router;
 use axum::http::{HeaderValue, Method};
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
-use sqlx::SqlitePool;
 use tower_http::cors::CorsLayer;
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
 use utoipa::{Modify, OpenApi};
@@ -14,8 +11,6 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::get_config;
 use crate::features;
-use crate::features::dashboard_auth::email_service::ConsoleEmailService;
-use crate::features::dashboard_auth::service::DashboardAuthService;
 
 #[derive(OpenApi)]
 #[openapi(modifiers(&SecurityAddon))]
@@ -35,9 +30,7 @@ impl Modify for SecurityAddon {
 }
 
 #[derive(Clone)]
-pub struct AppState {
-    pub dashboard_auth_service: Arc<dyn DashboardAuthService>,
-}
+pub struct AppState {}
 
 impl std::fmt::Debug for AppState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -62,18 +55,7 @@ pub async fn create_app() -> Result<Router, sqlx::Error> {
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_origin(cors_origins);
 
-    let db = setup_db().await?;
-    let email_service = Arc::new(ConsoleEmailService);
-    let dashboard_auth_service: Arc<dyn DashboardAuthService> = Arc::new(
-        crate::features::dashboard_auth::service_impl::DashboardAuthServiceImpl {
-            db,
-            email_service,
-            config: Arc::new(config.clone()),
-        },
-    );
-    let state = Arc::new(AppState {
-        dashboard_auth_service,
-    });
+    let state = Arc::new(AppState {});
 
     let health_route = features::health::router();
     let dashboard_auth_route = features::dashboard_auth::router();
@@ -92,13 +74,4 @@ pub async fn create_app() -> Result<Router, sqlx::Error> {
         .layer(cors);
 
     Ok(router)
-}
-
-pub async fn setup_db() -> Result<SqlitePool, sqlx::Error> {
-    let pool = SqlitePool::connect(&get_config().database_url).await?;
-    sqlx::query("PRAGMA journal_mode=WAL;")
-        .execute(&pool)
-        .await?;
-
-    Ok(pool)
 }

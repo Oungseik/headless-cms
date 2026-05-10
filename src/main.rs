@@ -2,7 +2,6 @@ use std::error::Error;
 use std::sync::Arc;
 
 mod app;
-mod auth;
 mod config;
 mod features;
 
