@@ -57,3 +57,14 @@ check:
 # Run cargo fmt
 fmt:
     cargo fmt
+
+# Run clippy with strict warnings across all targets and features
+lint:
+    cargo clippy --all-targets --all-features --locked -- -D warnings
+
+# Run all tests
+test:
+    cargo test --all
+
+# Run format check + lint + tests
+verify: fmt lint test
