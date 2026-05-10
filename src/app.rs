@@ -36,7 +36,6 @@ impl Modify for SecurityAddon {
 
 #[derive(Clone)]
 pub struct AppState {
-    pub db: SqlitePool,
     pub dashboard_auth_service: Arc<dyn DashboardAuthService>,
 }
 
@@ -67,13 +66,12 @@ pub async fn create_app() -> Result<Router, sqlx::Error> {
     let email_service = Arc::new(ConsoleEmailService);
     let dashboard_auth_service: Arc<dyn DashboardAuthService> = Arc::new(
         crate::features::dashboard_auth::service_impl::DashboardAuthServiceImpl {
-            db: db.clone(),
+            db,
             email_service,
             config: Arc::new(config.clone()),
         },
     );
     let state = Arc::new(AppState {
-        db,
         dashboard_auth_service,
     });
 
@@ -101,15 +99,6 @@ pub async fn setup_db() -> Result<SqlitePool, sqlx::Error> {
     sqlx::query("PRAGMA journal_mode=WAL;")
         .execute(&pool)
         .await?;
-
-    #[cfg(feature = "integration_testing")]
-    {
-        for m in migration::migrations() {
-            for sql in (m.up)() {
-                sqlx::raw_sql(&sql).execute(&pool).await?;
-            }
-        }
-    }
 
     Ok(pool)
 }
