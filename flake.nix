@@ -31,7 +31,7 @@
             just
           ];
 
-          DATABASE_URL = "sqlite:./data.db?mode=rwc";
+          DATABASE_URL = "sqlite:./data/cms.db?mode=rwc";
           OTEL_EXPORTER_OTLP_ENDPOINT = "http://localhost:4318";
           OTEL_TRACES_EXPORTER = "otlp";
           OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf";
