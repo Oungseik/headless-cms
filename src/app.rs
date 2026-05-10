@@ -105,5 +105,15 @@ pub async fn setup_db() -> Result<SqlitePool, sqlx::Error> {
     sqlx::query("PRAGMA journal_mode=WAL;")
         .execute(&pool)
         .await?;
+
+    #[cfg(feature = "integration_testing")]
+    {
+        for m in migration::migrations() {
+            for sql in (m.up)() {
+                sqlx::raw_sql(&sql).execute(&pool).await?;
+            }
+        }
+    }
+
     Ok(pool)
 }

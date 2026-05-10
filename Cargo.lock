@@ -1650,6 +1650,7 @@ dependencies = [
  "dotenv",
  "entity",
  "jsonwebtoken",
+ "migration",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",

@@ -46,9 +46,22 @@ migrate-create name:
 run:
     cargo run
 
-# Run cargo check
+# Run with integration testing features (inline migration + test endpoints)
+run-integration:
+    cargo run --features integration_testing
+
+# Run unit tests
+test:
+    cargo test
+
+# Run integration tests (with real DB + schema)
+test-integration:
+    cargo test --features integration_testing
+
+# Run cargo check (both default and integration_testing features)
 check:
     cargo check
+    cargo check --features integration_testing
 
 # Run cargo fmt
 fmt:

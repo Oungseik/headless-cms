@@ -40,6 +40,7 @@ clap = { version = "4.6.1", features = ["derive", "env"] }
 dotenv = "0.15.0"
 entity = { path = "entity" }
 jsonwebtoken = "9"
+migration = { path = "migration", optional = true }
 opentelemetry = "0.31.0"
 opentelemetry-otlp = { version = "0.31.1", features = [
   "http-proto",
@@ -65,7 +66,7 @@ uuid = { version = "1", features = ["serde", "v4"] }
 chrono = "0.4"
 
 [features]
-test = []
+integration_testing = ["dep:migration"]
 
 [lints]
 workspace = true

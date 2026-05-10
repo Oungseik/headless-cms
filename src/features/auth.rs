@@ -7,7 +7,7 @@ pub mod register;
 pub mod resend_verification;
 pub mod service;
 pub mod service_impl;
-#[cfg(feature = "test")]
+#[cfg(feature = "integration_testing")]
 pub mod verify_all;
 pub mod verify_email;
 
@@ -30,7 +30,7 @@ pub fn router() -> OpenApiRouter<Arc<AppState>> {
         .routes(routes!(logout::handler))
         .routes(routes!(me::handler));
 
-    #[cfg(feature = "test")]
+    #[cfg(feature = "integration_testing")]
     let router = router.route("/test/verify-all", axum::routing::post(verify_all::handler));
 
     router
