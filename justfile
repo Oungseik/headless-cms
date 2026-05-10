@@ -1,17 +1,17 @@
 # Generate .sql files from SeaQuery migration definitions
-migrate-generate:
+generate-migration:
     cargo run -p migration -- --output migrations/
 
 # Run pending migrations via sqlx-cli
-migrate-up:
+up-migration:
     sqlx migrate run --source migrations/
 
 # Revert last migration
-migrate-down:
+down-migration:
     sqlx migrate revert --source migrations/
 
 # Revert all migrations
-migrate-reset:
+reset-migration:
     sqlx migrate revert --source migrations/ --target-version 0
 
 # Check migration status
