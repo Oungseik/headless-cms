@@ -32,6 +32,7 @@ impl std::fmt::Debug for Config {
             .field("access_token_ttl", &self.access_token_ttl)
             .field("refresh_token_ttl", &self.refresh_token_ttl)
             .field("base_url", &self.base_url)
+            .field("allowed_origins", &self.allowed_origins)
             .field(
                 "email_verification_token_ttl",
                 &self.email_verification_token_ttl,
@@ -45,15 +46,6 @@ pub fn get_config() -> &'static Config {
     static CONFIG: OnceLock<Config> = OnceLock::new();
     CONFIG.get_or_init(|| {
         dotenv::dotenv().ok();
-        #[cfg(test)]
-        {
-            // Don't read CLI args in tests — nextest passes --exact which
-            // conflicts with clap. All fields have defaults/env fallbacks.
-            Config::parse_from(["test"])
-        }
-        #[cfg(not(test))]
-        {
-            Config::parse()
-        }
+        Config::parse()
     })
 }
