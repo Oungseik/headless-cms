@@ -72,11 +72,11 @@ When a service needs another service (e.g., `OrderService` needs `ProductService
 
 ```
 src/features/<domain>/
-  mod.rs           — pub fn router() -> OpenApiRouter<Arc<AppState>>
-  service.rs       — #[async_trait] trait definition
-  service_impl.rs  — production implementation (wraps DatabaseConnection)
-  service_mock.rs  — #[cfg(test)] mock with interior mutability
-  <operation>.rs   — one file per handler (e.g. get_by_id.rs, create.rs)
+  <domain>.rs       — pub fn router() -> OpenApiRouter<Arc<AppState>>
+  service.rs        — #[async_trait] trait definition
+  service_impl.rs   — production implementation (wraps DatabaseConnection)
+  service_mock.rs   — #[cfg(test)] mock with interior mutability
+  <operation>.rs    — one file per handler (e.g. get_by_id.rs, create.rs)
 ```
 
 Simple domains without a service layer (like health) can be a single file at `src/features/<domain>.rs` with a directory for handlers alongside it.
@@ -229,7 +229,7 @@ Every handler follows this shape: extract state/path/body, call service, map err
 
 ### 7. Create the router
 
-File: `src/features/<domain>/mod.rs`
+File: `src/features/<domain>.rs`
 
 ```rust
 pub mod get_by_id;
@@ -314,7 +314,7 @@ To add `create_post` to the posts domain:
 2. **Implement in service_impl** (`service_impl.rs`)
 3. **Add method to mock** (`service_mock.rs`)
 4. **Create handler file** (`create.rs`) with `UserResponse`/`PostResponse` or a new `<Operation>Response` type
-5. **Register in router** (`mod.rs`) — add `pub mod create;` and `.routes(routes!(create::handler))`
+5. **Register in router** (`<domain>.rs`) — add `pub mod create;` and `.routes(routes!(create::handler))`
 6. **Add utoipa path annotation** with request body and response types
 7. **Write tests** in the handler file
 
@@ -391,7 +391,7 @@ When adding a new domain, verify every item:
 - [ ] Import added to `src/app.rs`
 - [ ] Service constructed in `create_app()`
 - [ ] Handler files created with `#[utoipa::path]` annotations
-- [ ] `router()` function defined in `mod.rs`
+- [ ] `router()` function defined in `<domain>.rs`
 - [ ] Route registered via `.nest("/api/v1/<domain>", <domain>_route)` in `create_app()`
 - [ ] Mock service created in `service_mock.rs` under `#[cfg(test)]`
 - [ ] Tests written inline in handler files
