@@ -6,6 +6,7 @@ use sea_query::{Expr, ExprTrait, Query, SqliteQueryBuilder};
 use sea_query_sqlx::SqlxBinder;
 use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
+use uuid::Uuid;
 
 use super::email_service::EmailService;
 use super::service::{
@@ -48,7 +49,7 @@ impl AuthService for AuthServiceImpl {
             .and_where(Expr::col(User::Email).eq(email))
             .build_sqlx(SqliteQueryBuilder);
 
-        let existing: Option<(i32,)> = sqlx::query_as_with(&sql, values)
+        let existing: Option<(Uuid,)> = sqlx::query_as_with(&sql, values)
             .fetch_optional(&mut *txn)
             .await
             .map_err(AuthServiceError::Database)?;
@@ -62,12 +63,14 @@ impl AuthService for AuthServiceImpl {
         let password_hash = hash(password, DEFAULT_COST)
             .map_err(|_| AuthServiceError::Internal("password hashing failed".into()))?;
 
+        let user_id = Uuid::now_v7();
         let now = chrono::Utc::now().naive_utc();
 
         // Insert user
         let (sql, values) = Query::insert()
             .into_table(User::Table)
             .columns([
+                User::Id,
                 User::Email,
                 User::PasswordHash,
                 User::Role,
@@ -76,6 +79,7 @@ impl AuthService for AuthServiceImpl {
                 User::CreatedAt,
             ])
             .values_panic([
+                user_id.into(),
                 email.into(),
                 password_hash.into(),
                 role.into(),
@@ -85,15 +89,13 @@ impl AuthService for AuthServiceImpl {
             ])
             .build_sqlx(SqliteQueryBuilder);
 
-        let res = sqlx::query_with(&sql, values)
+        sqlx::query_with(&sql, values)
             .execute(&mut *txn)
             .await
             .map_err(AuthServiceError::Database)?;
 
-        let user_id: i32 = res.last_insert_rowid() as i32;
-
         // Insert verification token
-        let raw_token = uuid::Uuid::new_v4().to_string();
+        let raw_token = Uuid::now_v7().to_string();
         let token_hash = hash_token(&raw_token);
         let now_with_tz = chrono::Utc::now().fixed_offset();
         let expires_at = now_with_tz
@@ -372,7 +374,7 @@ impl AuthService for AuthServiceImpl {
             .map_err(AuthServiceError::Database)?;
 
         // Generate new verification token
-        let raw_token = uuid::Uuid::new_v4().to_string();
+        let raw_token = Uuid::now_v7().to_string();
         let token_hash = hash_token(&raw_token);
         let now_with_tz = chrono::Utc::now().fixed_offset();
         let expires_at = now_with_tz
@@ -470,7 +472,7 @@ impl AuthService for AuthServiceImpl {
             .map_err(AuthServiceError::Database)?;
 
         // Find user
-        let user_id: i32 = claims
+        let user_id: Uuid = claims
             .sub
             .parse()
             .map_err(|_| AuthServiceError::Unauthorized("Invalid token subject".to_string()))?;
@@ -586,7 +588,7 @@ impl AuthService for AuthServiceImpl {
         Ok(())
     }
 
-    async fn get_me(&self, user_id: i32) -> Result<MeResponse, AuthServiceError> {
+    async fn get_me(&self, user_id: Uuid) -> Result<MeResponse, AuthServiceError> {
         use entity::user::{User, UserRow};
 
         let (sql, values) = Query::select()

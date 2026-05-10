@@ -4,6 +4,7 @@ pub mod tests {
     use std::sync::Mutex;
 
     use async_trait::async_trait;
+    use uuid::Uuid;
 
     use crate::features::auth::service::{
         AuthResponse, AuthService, AuthServiceError, MeResponse, RefreshResponse, RegisterResponse,
@@ -13,10 +14,9 @@ pub mod tests {
     #[derive(Debug)]
     pub struct MockAuthService {
         pub users: Mutex<HashMap<String, entity::user::UserRow>>,
-        pub refresh_tokens: Mutex<HashMap<String, i32>>,
+        pub refresh_tokens: Mutex<HashMap<String, Uuid>>,
         pub verified_emails: Mutex<HashSet<String>>,
         pub verification_tokens: Mutex<HashMap<String, String>>,
-        pub next_id: Mutex<i32>,
     }
 
     impl MockAuthService {
@@ -26,7 +26,6 @@ pub mod tests {
                 refresh_tokens: Mutex::new(HashMap::new()),
                 verified_emails: Mutex::new(HashSet::new()),
                 verification_tokens: Mutex::new(HashMap::new()),
-                next_id: Mutex::new(1),
             }
         }
 
@@ -53,10 +52,7 @@ pub mod tests {
                 ));
             }
 
-            let mut next_id = self.next_id.lock().expect("mutex poisoned");
-            let id = *next_id;
-            *next_id += 1;
-
+            let id = Uuid::now_v7();
             let now = chrono::Utc::now().naive_utc();
             let user = entity::user::UserRow {
                 id,
@@ -186,7 +182,7 @@ pub mod tests {
             Ok(())
         }
 
-        async fn get_me(&self, user_id: i32) -> Result<MeResponse, AuthServiceError> {
+        async fn get_me(&self, user_id: Uuid) -> Result<MeResponse, AuthServiceError> {
             let users = self.users.lock().expect("mutex poisoned");
             let user = users
                 .values()

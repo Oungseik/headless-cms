@@ -1,9 +1,10 @@
 use async_trait::async_trait;
 use std::fmt;
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub enum UserServiceError {
-    NotFound(i32),
+    NotFound(Uuid),
     Database(sqlx::Error),
 }
 
@@ -20,5 +21,5 @@ impl std::error::Error for UserServiceError {}
 
 #[async_trait]
 pub trait UserService: Send + Sync + 'static {
-    async fn get_by_id(&self, id: i32) -> Result<Option<entity::user::UserRow>, UserServiceError>;
+    async fn get_by_id(&self, id: Uuid) -> Result<Option<entity::user::UserRow>, UserServiceError>;
 }

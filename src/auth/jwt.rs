@@ -1,12 +1,13 @@
 use chrono::{Duration, Utc};
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::config::get_config;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TokenClaims {
-    /// User ID as string
+    /// User ID as UUID string
     pub sub: String,
     /// "admin" or "customer"
     pub role: String,
@@ -16,7 +17,7 @@ pub struct TokenClaims {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RefreshTokenClaims {
-    /// User ID as string
+    /// User ID as UUID string
     pub sub: String,
     /// Always "refresh"
     pub typ: String,
@@ -25,7 +26,7 @@ pub struct RefreshTokenClaims {
 }
 
 pub fn generate_access_token(
-    user_id: i32,
+    user_id: Uuid,
     role: &str,
 ) -> Result<String, jsonwebtoken::errors::Error> {
     let config = get_config();
@@ -43,7 +44,7 @@ pub fn generate_access_token(
     )
 }
 
-pub fn generate_refresh_token(user_id: i32) -> Result<String, jsonwebtoken::errors::Error> {
+pub fn generate_refresh_token(user_id: Uuid) -> Result<String, jsonwebtoken::errors::Error> {
     let config = get_config();
     let now = Utc::now();
     let claims = RefreshTokenClaims {
@@ -87,18 +88,20 @@ mod tests {
 
     #[test]
     fn test_generate_and_validate_access_token() {
-        let token = generate_access_token(42, "admin").unwrap();
+        let user_id = Uuid::now_v7();
+        let token = generate_access_token(user_id, "admin").unwrap();
         let claims = validate_access_token(&token).unwrap();
-        assert_eq!(claims.sub, "42");
+        assert_eq!(claims.sub, user_id.to_string());
         assert_eq!(claims.role, "admin");
         assert!(claims.exp > claims.iat);
     }
 
     #[test]
     fn test_generate_and_validate_refresh_token() {
-        let token = generate_refresh_token(7).unwrap();
+        let user_id = Uuid::now_v7();
+        let token = generate_refresh_token(user_id).unwrap();
         let claims = validate_refresh_token(&token).unwrap();
-        assert_eq!(claims.sub, "7");
+        assert_eq!(claims.sub, user_id.to_string());
         assert_eq!(claims.typ, "refresh");
         assert!(claims.exp > claims.iat);
     }
@@ -111,7 +114,8 @@ mod tests {
 
     #[test]
     fn test_validate_access_token_wrong_secret() {
-        let token = generate_access_token(1, "customer").unwrap();
+        let user_id = Uuid::now_v7();
+        let token = generate_access_token(user_id, "customer").unwrap();
         let wrong_key = jsonwebtoken::DecodingKey::from_secret(b"wrong-secret");
         let result = jsonwebtoken::decode::<TokenClaims>(
             &token,
@@ -123,7 +127,8 @@ mod tests {
 
     #[test]
     fn test_validate_refresh_token_with_access_token() {
-        let refresh_token = generate_refresh_token(1).unwrap();
+        let user_id = Uuid::now_v7();
+        let refresh_token = generate_refresh_token(user_id).unwrap();
         let result = validate_access_token(&refresh_token);
         assert!(
             result.is_err(),

@@ -8,13 +8,7 @@ fn create_user_table() -> String {
     Table::create()
         .table(User::Table)
         .if_not_exists()
-        .col(
-            ColumnDef::new(User::Id)
-                .integer()
-                .not_null()
-                .auto_increment()
-                .primary_key(),
-        )
+        .col(ColumnDef::new(User::Id).text().not_null().primary_key())
         .col(ColumnDef::new(User::Email).string().not_null().unique_key())
         .col(
             ColumnDef::new(User::PasswordHash)
@@ -56,12 +50,11 @@ fn create_refresh_tokens_table() -> String {
         .if_not_exists()
         .col(
             ColumnDef::new(RefreshToken::Id)
-                .integer()
+                .text()
                 .not_null()
-                .auto_increment()
                 .primary_key(),
         )
-        .col(ColumnDef::new(RefreshToken::UserId).integer().not_null())
+        .col(ColumnDef::new(RefreshToken::UserId).text().not_null())
         .col(
             ColumnDef::new(RefreshToken::TokenHash)
                 .string()
@@ -95,14 +88,13 @@ fn create_email_verification_tokens_table() -> String {
         .if_not_exists()
         .col(
             ColumnDef::new(EmailVerificationToken::Id)
-                .integer()
+                .text()
                 .not_null()
-                .auto_increment()
                 .primary_key(),
         )
         .col(
             ColumnDef::new(EmailVerificationToken::UserId)
-                .integer()
+                .text()
                 .not_null(),
         )
         .col(

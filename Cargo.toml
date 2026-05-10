@@ -13,12 +13,17 @@ members = ["entity", "migration"]
 sea-query = { version = "=1.0.0-rc.34", features = [
   "backend-sqlite",
   "derive",
+  "with-uuid",
 ] }
-sea-query-sqlx = { version = "=0.8.0-rc.16", features = ["sqlx-sqlite"] }
+sea-query-sqlx = { version = "=0.8.0-rc.16", features = [
+  "sqlx-sqlite",
+  "with-uuid",
+] }
 sqlx = { version = "0.8", features = [
   "chrono",
   "runtime-tokio-rustls",
   "sqlite",
+  "uuid",
 ] }
 
 [workspace.lints.clippy]
@@ -60,7 +65,7 @@ tracing-subscriber = { version = "0.3.23", features = ["tracing"] }
 utoipa = { version = "5.4.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-axum = "0.2.0"
 utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
-uuid = { version = "1", features = ["serde", "v4"] }
+uuid = { version = "1", features = ["serde", "v7"] }
 
 [dev-dependencies]
 chrono = "0.4"

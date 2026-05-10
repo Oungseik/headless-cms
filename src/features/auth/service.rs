@@ -3,6 +3,7 @@ use std::fmt;
 use async_trait::async_trait;
 use chrono::FixedOffset;
 use chrono::{DateTime, NaiveDateTime};
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub enum AuthServiceError {
@@ -32,7 +33,7 @@ impl std::error::Error for AuthServiceError {}
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UserResponse {
-    pub id: i32,
+    pub id: Uuid,
     pub email: String,
     pub role: String,
     pub is_active: bool,
@@ -87,7 +88,7 @@ pub struct ResendVerificationResponse {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MeResponse {
-    pub id: i32,
+    pub id: Uuid,
     pub email: String,
     pub role: String,
     pub is_active: bool,
@@ -126,5 +127,5 @@ pub trait AuthService: Send + Sync + 'static {
     ) -> Result<ResendVerificationResponse, AuthServiceError>;
     async fn refresh(&self, token: &str) -> Result<RefreshResponse, AuthServiceError>;
     async fn logout(&self, token: &str) -> Result<(), AuthServiceError>;
-    async fn get_me(&self, user_id: i32) -> Result<MeResponse, AuthServiceError>;
+    async fn get_me(&self, user_id: Uuid) -> Result<MeResponse, AuthServiceError>;
 }

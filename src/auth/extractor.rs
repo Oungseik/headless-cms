@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
+use uuid::Uuid;
 
 use crate::app::AppState;
 use crate::app::error::AppError;
@@ -12,7 +13,7 @@ use crate::auth::jwt::validate_access_token;
 /// Returns [`AppError::Unauthorized`] if the header is missing or the token is invalid.
 #[derive(Debug)]
 pub struct AuthUser {
-    pub user_id: i32,
+    pub user_id: Uuid,
     pub role: String,
 }
 
@@ -38,7 +39,7 @@ impl FromRequestParts<Arc<AppState>> for AuthUser {
 
         let user_id = claims
             .sub
-            .parse::<i32>()
+            .parse::<Uuid>()
             .map_err(|_| AppError::Unauthorized)?;
 
         Ok(Self {
@@ -53,7 +54,7 @@ impl FromRequestParts<Arc<AppState>> for AuthUser {
 /// Returns [`AppError::Forbidden`] if the user is not an admin.
 #[derive(Debug)]
 pub struct AdminUser {
-    pub user_id: i32,
+    pub user_id: Uuid,
 }
 
 impl FromRequestParts<Arc<AppState>> for AdminUser {
@@ -97,6 +98,7 @@ mod tests {
 
     use axum::extract::FromRequestParts;
     use axum::http::Request;
+    use uuid::Uuid;
 
     use crate::app::AppState;
     use crate::app::error::AppError;
@@ -129,12 +131,13 @@ mod tests {
     #[tokio::test]
     async fn test_auth_user_valid_token() {
         let state = setup_state();
-        let token = generate_access_token(42, "admin").unwrap();
+        let user_id = Uuid::now_v7();
+        let token = generate_access_token(user_id, "admin").unwrap();
         let mut parts = make_parts_with_token(&token);
         let user = AuthUser::from_request_parts(&mut parts, &state)
             .await
             .unwrap();
-        assert_eq!(user.user_id, 42);
+        assert_eq!(user.user_id, user_id);
         assert_eq!(user.role, "admin");
     }
 
@@ -160,18 +163,20 @@ mod tests {
     #[tokio::test]
     async fn test_admin_user_valid_admin() {
         let state = setup_state();
-        let token = generate_access_token(1, "admin").unwrap();
+        let user_id = Uuid::now_v7();
+        let token = generate_access_token(user_id, "admin").unwrap();
         let mut parts = make_parts_with_token(&token);
         let admin = AdminUser::from_request_parts(&mut parts, &state)
             .await
             .unwrap();
-        assert_eq!(admin.user_id, 1);
+        assert_eq!(admin.user_id, user_id);
     }
 
     #[tokio::test]
     async fn test_admin_user_non_admin() {
         let state = setup_state();
-        let token = generate_access_token(5, "customer").unwrap();
+        let user_id = Uuid::now_v7();
+        let token = generate_access_token(user_id, "customer").unwrap();
         let mut parts = make_parts_with_token(&token);
         let result = AdminUser::from_request_parts(&mut parts, &state).await;
         assert!(result.is_err());
@@ -200,14 +205,15 @@ mod tests {
     #[tokio::test]
     async fn test_optional_auth_user_valid_token() {
         let state = setup_state();
-        let token = generate_access_token(99, "customer").unwrap();
+        let user_id = Uuid::now_v7();
+        let token = generate_access_token(user_id, "customer").unwrap();
         let mut parts = make_parts_with_token(&token);
         let opt_user = OptionalAuthUser::from_request_parts(&mut parts, &state)
             .await
             .unwrap();
         assert!(opt_user.0.is_some());
         let user = opt_user.0.unwrap();
-        assert_eq!(user.user_id, 99);
+        assert_eq!(user.user_id, user_id);
         assert_eq!(user.role, "customer");
     }
 }

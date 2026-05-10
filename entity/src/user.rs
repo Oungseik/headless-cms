@@ -1,4 +1,5 @@
 use sea_query::Iden;
+use uuid::Uuid;
 
 #[derive(Iden)]
 pub enum User {
@@ -15,7 +16,7 @@ pub enum User {
 
 #[derive(sqlx::FromRow, Debug, Clone)]
 pub struct UserRow {
-    pub id: i32,
+    pub id: Uuid,
     pub email: String,
     pub password_hash: String,
     pub role: String,

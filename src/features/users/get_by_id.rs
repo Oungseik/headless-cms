@@ -5,6 +5,7 @@ use axum::extract::{Path, State};
 use chrono::NaiveDateTime;
 use serde::Serialize;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 use crate::app::AppState;
 use crate::app::error::{AppError, AppResult, ErrorResponse};
@@ -12,7 +13,7 @@ use crate::app::error::{AppError, AppResult, ErrorResponse};
 #[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UserResponse {
-    pub id: i32,
+    pub id: Uuid,
     pub email: String,
     pub created_at: NaiveDateTime,
 }
@@ -42,7 +43,7 @@ impl From<entity::user::UserRow> for UserResponse {
 #[tracing::instrument]
 pub async fn handler(
     State(state): State<Arc<AppState>>,
-    Path(id): Path<i32>,
+    Path(id): Path<Uuid>,
 ) -> AppResult<Json<UserResponse>> {
     let user = state
         .user_service
@@ -59,6 +60,7 @@ mod tests {
     use std::sync::Arc;
 
     use axum::extract::{Path, State};
+    use uuid::Uuid;
 
     use crate::app::AppState;
     use crate::features::auth::service::AuthService;
@@ -69,9 +71,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_by_id_found() {
         let mock = MockUserService::new();
+        let user_id = Uuid::now_v7();
         let now = chrono::Utc::now().naive_utc();
         let test_user = entity::user::UserRow {
-            id: 1,
+            id: user_id,
             email: "test@example.com".into(),
             password_hash: String::new(),
             role: "customer".into(),
@@ -83,7 +86,7 @@ mod tests {
         mock.users
             .lock()
             .expect("mock users mutex poisoned")
-            .insert(1, test_user.clone());
+            .insert(user_id, test_user.clone());
 
         let mock: Arc<dyn UserService> = Arc::new(mock);
         let auth_service: Arc<dyn AuthService> = Arc::new(MockAuthService::new());
@@ -93,11 +96,11 @@ mod tests {
             auth_service,
         });
 
-        let result = super::handler(State(state), Path(1)).await;
+        let result = super::handler(State(state), Path(user_id)).await;
         let response = result.unwrap_or_else(|e| panic!("handler should return Ok: {e:?}"));
         let user = response.0;
 
-        assert_eq!(user.id, 1);
+        assert_eq!(user.id, user_id);
         assert_eq!(user.email, "test@example.com");
     }
 
@@ -111,7 +114,7 @@ mod tests {
             auth_service,
         });
 
-        let result = super::handler(State(state), Path(999)).await;
+        let result = super::handler(State(state), Path(Uuid::now_v7())).await;
         assert!(result.is_err());
     }
 }

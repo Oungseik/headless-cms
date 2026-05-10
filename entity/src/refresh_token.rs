@@ -1,4 +1,5 @@
 use sea_query::Iden;
+use uuid::Uuid;
 
 #[derive(Iden)]
 pub enum RefreshToken {
@@ -13,8 +14,8 @@ pub enum RefreshToken {
 
 #[derive(sqlx::FromRow, Debug, Clone)]
 pub struct RefreshTokenRow {
-    pub id: i32,
-    pub user_id: i32,
+    pub id: Uuid,
+    pub user_id: Uuid,
     pub token_hash: String,
     pub expires_at: chrono::NaiveDateTime,
     pub revoked_at: Option<chrono::NaiveDateTime>,

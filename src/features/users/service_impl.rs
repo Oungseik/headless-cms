@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use sea_query::{Expr, ExprTrait, Query, SqliteQueryBuilder};
 use sea_query_sqlx::SqlxBinder;
 use sqlx::SqlitePool;
+use uuid::Uuid;
 
 use super::service::{UserService, UserServiceError};
 
@@ -12,7 +13,7 @@ pub struct UserServiceImpl {
 
 #[async_trait]
 impl UserService for UserServiceImpl {
-    async fn get_by_id(&self, id: i32) -> Result<Option<entity::user::UserRow>, UserServiceError> {
+    async fn get_by_id(&self, id: Uuid) -> Result<Option<entity::user::UserRow>, UserServiceError> {
         use entity::user::User;
 
         let (sql, values) = Query::select()

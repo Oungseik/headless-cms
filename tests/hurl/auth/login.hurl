@@ -37,7 +37,7 @@ jsonpath "$.email" == "test@example.com"
 jsonpath "$.role" == "customer"
 jsonpath "$.isActive" == true
 jsonpath "$.emailVerifiedAt" exists
-jsonpath "$.id" isInteger
+jsonpath "$.id" isString
 jsonpath "$.createdAt" isString
 jsonpath "$.updatedAt" isString
 jsonpath "$.passwordHash" not exists

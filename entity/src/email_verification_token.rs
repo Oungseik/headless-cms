@@ -1,4 +1,5 @@
 use sea_query::Iden;
+use uuid::Uuid;
 
 #[derive(Iden)]
 pub enum EmailVerificationToken {
@@ -12,8 +13,8 @@ pub enum EmailVerificationToken {
 
 #[derive(sqlx::FromRow, Debug, Clone)]
 pub struct EmailVerificationTokenRow {
-    pub id: i32,
-    pub user_id: i32,
+    pub id: Uuid,
+    pub user_id: Uuid,
     pub token_hash: String,
     pub expires_at: chrono::DateTime<chrono::FixedOffset>,
     pub created_at: chrono::DateTime<chrono::FixedOffset>,
