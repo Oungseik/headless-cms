@@ -42,21 +42,9 @@ migrate-create name:
     echo "Created ${MIGRATION_FILE}"
     echo "Don't forget to add the migration to migration/src/lib.rs"
 
-# Run the application
-run:
-    cargo run
-
-# Run with integration testing features (inline migration + test endpoints)
-run-integration:
-    cargo run --features integration_testing
-
-# Run unit tests
-test:
-    cargo test
-
-# Run integration tests (with real DB + schema)
-test-integration:
-    cargo test --features integration_testing
+# Run test server with release profile (for integration/performance testing via Hurl)
+test-server:
+    cargo run --release --features integration_testing
 
 # Run cargo check (both default and integration_testing features)
 check:
