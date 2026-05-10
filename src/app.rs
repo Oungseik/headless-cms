@@ -54,7 +54,7 @@ pub async fn create_app() -> Result<Router, sqlx::Error> {
     let cors_origins: Vec<_> = config
         .allowed_origins
         .split(',')
-        .map(|s| s.trim())
+        .map(str::trim)
         .filter(|s| !s.is_empty())
         .map(|s| HeaderValue::from_str(s).expect("invalid origin in ALLOWED_ORIGINS"))
         .collect();
