@@ -1,3 +1,8 @@
+// allow: false positive from utoipa derive macro expansion
+#![allow(clippy::needless_for_each)]
+
+pub mod error;
+
 use std::sync::Arc;
 
 use axum::Router;
@@ -9,13 +14,16 @@ use utoipa::{Modify, OpenApi};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
 
+use crate::app::error::{AppError, AppResult};
 use crate::config::get_config;
 use crate::features;
 
+/// `OpenAPI` documentation specification.
 #[derive(OpenApi)]
 #[openapi(modifiers(&SecurityAddon))]
 pub struct ApiDoc;
 
+/// Adds JWT bearer security scheme to the `OpenAPI` spec.
 pub struct SecurityAddon;
 
 impl Modify for SecurityAddon {
@@ -29,6 +37,11 @@ impl Modify for SecurityAddon {
     }
 }
 
+/// Shared application state passed to all route handlers.
+///
+/// Holds `Arc<dyn <Domain>Service>` for each domain, enabling test-time
+/// substitution via mocks. `DatabaseConnection` is NOT stored here — it lives
+/// only inside each `*ServiceImpl`.
 #[derive(Clone)]
 pub struct AppState {}
 
@@ -41,15 +54,24 @@ impl std::fmt::Debug for AppState {
     }
 }
 
-pub async fn create_app() -> Result<Router, sqlx::Error> {
+/// Builds the complete Axum [`Router`] with all routes, middleware, and CORS.
+///
+/// # Errors
+///
+/// Returns [`AppError`] if CORS origin parsing fails or database connection fails.
+pub async fn create_app() -> AppResult<Router> {
     let config = get_config();
     let cors_origins: Vec<_> = config
         .allowed_origins
         .split(',')
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .map(|s| HeaderValue::from_str(s).expect("invalid origin in ALLOWED_ORIGINS"))
-        .collect();
+        .map(|s| {
+            HeaderValue::from_str(s).map_err(|e| {
+                AppError::BadRequest(format!("invalid origin in ALLOWED_ORIGINS: {e}"))
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])

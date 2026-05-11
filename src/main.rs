@@ -19,7 +19,7 @@ use tracing_subscriber::prelude::*;
 const SERVICE_NAME: &str = "pos_backend";
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let resource = Resource::builder().with_service_name(SERVICE_NAME).build();
     let exporter = SpanExporter::builder().with_http().build()?;
 
@@ -67,6 +67,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// Waits for a Ctrl+C or SIGTERM signal to trigger graceful shutdown.
+///
+/// # Panics
+///
+/// Panics if the OS signal handlers cannot be installed — the server cannot
+/// shut down gracefully without them.
 async fn shutdown_signal() {
     let ctrl_c = async {
         tokio::signal::ctrl_c()

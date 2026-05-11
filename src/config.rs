@@ -1,6 +1,7 @@
 use clap::Parser;
 use std::sync::OnceLock;
 
+/// Application configuration loaded from environment variables or CLI flags.
 #[derive(clap::Parser, Clone)]
 pub struct Config {
     #[clap(long, env, default_value = "sqlite::memory:")]
@@ -42,10 +43,14 @@ impl std::fmt::Debug for Config {
     }
 }
 
+/// Returns a static reference to the global [`Config`].
+///
+/// Loads `.env` on first call via `dotenvy`, then parses CLI/env flags.
+/// Subsequent calls return the same instance.
 pub fn get_config() -> &'static Config {
     static CONFIG: OnceLock<Config> = OnceLock::new();
     CONFIG.get_or_init(|| {
-        dotenv::dotenv().ok();
+        dotenvy::dotenv().ok();
         Config::parse()
     })
 }
