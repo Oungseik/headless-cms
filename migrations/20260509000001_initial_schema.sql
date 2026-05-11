@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS "employee_refresh_token" (
     "expires_at" timestamp_with_timezone_text NOT NULL,
     "revoked_at" timestamp_with_timezone_text,
     "created_at" timestamp_with_timezone_text NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY ("fk_employee_refresh_tokens_employee_id") REFERENCES "employee" ("id") ON DELETE CASCADE
+    FOREIGN KEY ("employee_id") REFERENCES "employee" ("id") ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS "employee_email_verification_token" (
@@ -25,9 +25,7 @@ CREATE TABLE IF NOT EXISTS "employee_email_verification_token" (
     "token_hash" varchar NOT NULL UNIQUE,
     "expires_at" timestamp_with_timezone_text NOT NULL,
     "created_at" timestamp_with_timezone_text NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (
-        "fk_employee_email_verification_tokens_employee_id"
-    ) REFERENCES "employee" ("id") ON DELETE CASCADE
+    FOREIGN KEY ("employee_id") REFERENCES "employee" ("id") ON DELETE CASCADE
 );
 
 CREATE INDEX "idx_employee_email_verification_tokens_employee_id" ON "employee_email_verification_token" ("employee_id");
