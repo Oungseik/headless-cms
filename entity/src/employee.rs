@@ -1,7 +1,9 @@
 use sea_query::Iden;
 use uuid::Uuid;
 
+/// Column identifiers for the `employee` table, used with [`SeaQuery`](sea_query).
 #[derive(Iden)]
+#[expect(missing_docs, reason = "variants mirror database column names")]
 pub enum Employee {
     Table,
     Id,
@@ -14,7 +16,9 @@ pub enum Employee {
     UpdatedAt,
 }
 
+/// A row from the `employee` table.
 #[derive(sqlx::FromRow, Debug, Clone)]
+#[expect(missing_docs, reason = "fields mirror database columns")]
 pub struct EmployeeRow {
     pub id: Uuid,
     pub email: String,
