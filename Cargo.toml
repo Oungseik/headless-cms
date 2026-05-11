@@ -7,7 +7,7 @@ repository = "https://github.com/oungseik/pos-backend"
 
 [workspace]
 resolver = "3"
-members = ["entity", "migration"]
+members = ["entity"]
 
 [workspace.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
@@ -56,7 +56,6 @@ dotenvy = "0.15"
 entity = { path = "entity" }
 hex = "0.4"
 jsonwebtoken = "9"
-migration = { path = "migration", optional = true }
 opentelemetry = "0.31.0"
 opentelemetry-otlp = { version = "0.31.1", features = [
   "http-proto",
@@ -81,9 +80,5 @@ utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 uuid = { workspace = true }
 
 [dev-dependencies]
-
-[features]
-integration_testing = ["dep:migration"]
-
 [lints]
 workspace = true

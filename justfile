@@ -44,10 +44,10 @@ migrate-create name:
 
 # Run test server with release profile (for integration/performance testing via Hurl)
 test-server:
-    DATABASE_URL="sqlite::memory:?cache=shared" cargo run --features integration_testing
+    DATABASE_URL="sqlite::memory:?cache=shared" cargo run 
 
 test-server-release:
-    DATABASE_URL="sqlite::memory:?cache=shared" cargo run --release --features integration_testing
+    DATABASE_URL="sqlite::memory:?cache=shared" cargo run --release 
 
 # Run cargo check (both default and integration_testing features)
 check:

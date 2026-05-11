@@ -8,6 +8,8 @@ use std::sync::Arc;
 use axum::Router;
 use axum::http::{HeaderValue, Method};
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
+use sqlx::SqlitePool;
+use sqlx::sqlite::SqlitePoolOptions;
 use tower_http::cors::CorsLayer;
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
 use utoipa::{Modify, OpenApi};
@@ -38,18 +40,15 @@ impl Modify for SecurityAddon {
 }
 
 /// Shared application state passed to all route handlers.
-///
-/// Holds `Arc<dyn <Domain>Service>` for each domain, enabling test-time
-/// substitution via mocks. `DatabaseConnection` is NOT stored here — it lives
-/// only inside each `*ServiceImpl`.
 #[derive(Clone)]
-pub struct AppState {}
+pub struct AppState {
+    pub db: SqlitePool,
+}
 
 impl std::fmt::Debug for AppState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AppState")
             .field("db", &"SqlitePool")
-            .field("dashboard_auth_service", &"Arc<dyn DashboardAuthService>")
             .finish()
     }
 }
@@ -61,6 +60,23 @@ impl std::fmt::Debug for AppState {
 /// Returns [`AppError`] if CORS origin parsing fails or database connection fails.
 pub async fn create_app() -> AppResult<Router> {
     let config = get_config();
+
+    let pool = SqlitePoolOptions::new()
+        .connect(&config.database_url)
+        .await
+        .map_err(|e| {
+            tracing::error!("failed to connect to database: {e}");
+            AppError::InternalServerError
+        })?;
+
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .map_err(|e| {
+            tracing::error!("failed to run migrations: {e}");
+            AppError::InternalServerError
+        })?;
+
     let cors_origins: Vec<_> = config
         .allowed_origins
         .split(',')
@@ -77,7 +93,7 @@ pub async fn create_app() -> AppResult<Router> {
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_origin(cors_origins);
 
-    let state = Arc::new(AppState {});
+    let state = Arc::new(AppState { db: pool });
 
     let health_route = features::health::router();
     let dashboard_auth_route = features::dashboard_auth::router();
