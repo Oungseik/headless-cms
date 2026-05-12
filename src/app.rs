@@ -5,21 +5,26 @@ pub mod error;
 
 use std::sync::Arc;
 
-use axum::Router;
-use axum::http::{HeaderValue, Method};
+use axum::{
+    Router,
+    http::{HeaderValue, Method},
+};
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
 use sqlx::SqlitePool;
 use tower_http::cors::CorsLayer;
-use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
-use utoipa::{Modify, OpenApi};
+use utoipa::{
+    Modify, OpenApi,
+    openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
+};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::app::error::{AppError, AppResult};
-use crate::config::get_config;
-use crate::features;
-use crate::features::dashboard_auth::service::DashboardAuthService;
-use crate::features::dashboard_auth::service_impl::DashboardAuthServiceImpl;
+use crate::{
+    app::error::{AppError, AppResult},
+    config::get_config,
+    features,
+    features::dashboard_auth::service_impl::DashboardAuthServiceImpl,
+};
 
 /// `OpenAPI` documentation specification.
 #[derive(OpenApi)]
@@ -41,17 +46,9 @@ impl Modify for SecurityAddon {
 }
 
 /// Shared application state passed to all route handlers.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AppState {
-    pub dashboard_auth_service: Arc<dyn DashboardAuthService>,
-}
-
-impl std::fmt::Debug for AppState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AppState")
-            .field("dashboard_auth_service", &"Arc<dyn DashboardAuthService>")
-            .finish()
-    }
+    pub dashboard_auth_service: DashboardAuthServiceImpl,
 }
 
 /// Builds the complete Axum [`Router`] with all routes, middleware, and CORS.
@@ -90,12 +87,11 @@ pub async fn create_app() -> AppResult<Router> {
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_origin(cors_origins);
 
-    let dashboard_auth_service: Arc<dyn DashboardAuthService> =
-        Arc::new(DashboardAuthServiceImpl {
-            pool,
-            bcrypt_cost: config.bcrypt_cost,
-            email_verification_token_ttl: config.email_verification_token_ttl,
-        });
+    let dashboard_auth_service = DashboardAuthServiceImpl {
+        pool,
+        bcrypt_cost: config.bcrypt_cost,
+        email_verification_token_ttl: config.email_verification_token_ttl,
+    };
 
     let state = Arc::new(AppState {
         dashboard_auth_service,

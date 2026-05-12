@@ -3,6 +3,7 @@ use uuid::Uuid;
 
 /// Refresh token model for session management.
 #[derive(Clone, Debug, sqlx::FromRow)]
+#[expect(dead_code, reason = "used by repository queries")]
 pub struct EmployeeRefreshToken {
     /// Primary key — UUID v7 stored as text.
     pub id: Uuid,

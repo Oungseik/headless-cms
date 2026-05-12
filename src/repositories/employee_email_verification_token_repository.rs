@@ -36,6 +36,7 @@ pub async fn insert<'e, E: sqlx::Executor<'e, Database = Sqlite>>(
 /// # Errors
 ///
 /// Returns [`sqlx::Error`] if the query fails.
+#[expect(dead_code, reason = "will be used by email verification handler")]
 pub async fn find_by_hash<'e, E: sqlx::Executor<'e, Database = Sqlite>>(
     executor: E,
     token_hash: &str,

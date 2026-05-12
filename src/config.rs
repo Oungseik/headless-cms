@@ -1,5 +1,6 @@
-use clap::Parser;
 use std::sync::OnceLock;
+
+use clap::Parser;
 
 /// Application configuration loaded from environment variables or CLI flags.
 #[derive(clap::Parser, Clone)]

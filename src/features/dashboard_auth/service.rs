@@ -1,5 +1,3 @@
-use async_trait::async_trait;
-
 #[derive(Debug, thiserror::Error)]
 pub enum DashboardAuthServiceError {
     #[error("an owner has already been registered")]
@@ -13,16 +11,11 @@ pub enum DashboardAuthServiceError {
 }
 
 /// Service for dashboard authentication operations.
-#[async_trait]
 pub trait DashboardAuthService: Send + Sync + 'static {
     /// Registers the first owner account.
     ///
     /// Fails with [`DashboardAuthServiceError::OwnerAlreadyExists`] if an owner
     /// already exists, or [`DashboardAuthServiceError::WeakPassword`] if the
     /// password is shorter than 8 characters.
-    async fn register<'a>(
-        &'a self,
-        email: &'a str,
-        password: &'a str,
-    ) -> Result<(), DashboardAuthServiceError>;
+    async fn register(&self, email: &str, password: &str) -> Result<(), DashboardAuthServiceError>;
 }

@@ -3,6 +3,7 @@ use uuid::Uuid;
 
 /// Email verification token model.
 #[derive(Clone, Debug, sqlx::FromRow)]
+#[expect(dead_code, reason = "used by repository queries")]
 pub struct EmployeeEmailVerificationToken {
     /// Primary key — UUID v7 stored as text.
     pub id: Uuid,

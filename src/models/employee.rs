@@ -3,6 +3,7 @@ use uuid::Uuid;
 
 /// Employee account model.
 #[derive(Clone, Debug, sqlx::FromRow)]
+#[expect(dead_code, reason = "used by repository queries")]
 pub struct Employee {
     /// Primary key — UUID v7 stored as text.
     pub id: Uuid,

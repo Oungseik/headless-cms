@@ -1,26 +1,22 @@
-use async_trait::async_trait;
 use chrono::Utc;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use super::service::{DashboardAuthService, DashboardAuthServiceError};
-use crate::auth;
-use crate::repositories::{employee_email_verification_token_repository, employee_repository};
+use crate::{
+    auth,
+    repositories::{employee_email_verification_token_repository, employee_repository},
+};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DashboardAuthServiceImpl {
     pub pool: SqlitePool,
     pub bcrypt_cost: u32,
     pub email_verification_token_ttl: u64,
 }
 
-#[async_trait]
 impl DashboardAuthService for DashboardAuthServiceImpl {
-    async fn register<'a>(
-        &'a self,
-        email: &'a str,
-        password: &'a str,
-    ) -> Result<(), DashboardAuthServiceError> {
+    async fn register(&self, email: &str, password: &str) -> Result<(), DashboardAuthServiceError> {
         if password.len() < 8 {
             return Err(DashboardAuthServiceError::WeakPassword);
         }
@@ -42,14 +38,16 @@ impl DashboardAuthService for DashboardAuthServiceImpl {
 
         employee_repository::insert(
             &mut *txn,
-            employee_id,
-            email,
-            &password_hash,
-            "owner",
-            true,
-            None,
-            now,
-            now,
+            employee_repository::CreateEmployee {
+                id: employee_id,
+                email,
+                password_hash: &password_hash,
+                role: "owner",
+                is_active: true,
+                email_verified_at: None,
+                created_at: now,
+                updated_at: now,
+            },
         )
         .await?;
 

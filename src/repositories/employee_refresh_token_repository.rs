@@ -9,6 +9,7 @@ use crate::models::employee_refresh_token::EmployeeRefreshToken;
 /// # Errors
 ///
 /// Returns [`sqlx::Error`] if the insert fails.
+#[expect(dead_code, reason = "will be used by login handler")]
 pub async fn insert<'e, E: sqlx::Executor<'e, Database = Sqlite>>(
     executor: E,
     id: Uuid,
@@ -36,6 +37,7 @@ pub async fn insert<'e, E: sqlx::Executor<'e, Database = Sqlite>>(
 /// # Errors
 ///
 /// Returns [`sqlx::Error`] if the query fails.
+#[expect(dead_code, reason = "will be used by token refresh handler")]
 pub async fn find_by_hash<'e, E: sqlx::Executor<'e, Database = Sqlite>>(
     executor: E,
     token_hash: &str,
@@ -53,6 +55,7 @@ pub async fn find_by_hash<'e, E: sqlx::Executor<'e, Database = Sqlite>>(
 /// # Errors
 ///
 /// Returns [`sqlx::Error`] if the update fails.
+#[expect(dead_code, reason = "will be used by logout handler")]
 pub async fn revoke<'e, E: sqlx::Executor<'e, Database = Sqlite>>(
     executor: E,
     token_hash: &str,

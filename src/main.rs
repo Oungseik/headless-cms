@@ -1,5 +1,4 @@
-use std::error::Error;
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 
 mod app;
 mod auth;
@@ -12,12 +11,10 @@ use app::create_app;
 use config::get_config;
 use opentelemetry::trace::TracerProvider;
 use opentelemetry_otlp::SpanExporter;
-use opentelemetry_sdk::Resource;
-use opentelemetry_sdk::trace::SdkTracerProvider;
+use opentelemetry_sdk::{Resource, trace::SdkTracerProvider};
 use tokio::net::TcpListener;
 use tracing::{info, span};
-use tracing_subscriber::Registry;
-use tracing_subscriber::prelude::*;
+use tracing_subscriber::{Registry, prelude::*};
 
 const SERVICE_NAME: &str = "pos_backend";
 
