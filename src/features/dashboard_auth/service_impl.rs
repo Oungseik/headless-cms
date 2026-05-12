@@ -70,4 +70,16 @@ impl DashboardAuthService for DashboardAuthServiceImpl {
 
         Ok(())
     }
+
+    async fn verify_all(&self) -> Result<(), DashboardAuthServiceError> {
+        let now = Utc::now();
+        let mut txn = self.pool.begin().await?;
+
+        employee_repository::update_all_email_verified_at(&mut *txn, now).await?;
+        employee_email_verification_token_repository::delete_all(&mut *txn).await?;
+
+        txn.commit().await?;
+
+        Ok(())
+    }
 }

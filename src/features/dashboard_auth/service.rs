@@ -18,4 +18,9 @@ pub trait DashboardAuthService: Send + Sync + 'static {
     /// already exists, or [`DashboardAuthServiceError::WeakPassword`] if the
     /// password is shorter than 8 characters.
     async fn register(&self, email: &str, password: &str) -> Result<(), DashboardAuthServiceError>;
+
+    /// Marks all employees as email-verified and deletes all verification tokens.
+    ///
+    /// Intended for testing only.
+    async fn verify_all(&self) -> Result<(), DashboardAuthServiceError>;
 }

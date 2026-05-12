@@ -2,9 +2,18 @@ use std::sync::OnceLock;
 
 use clap::Parser;
 
+#[derive(Clone, Debug, PartialEq, Eq, clap::ValueEnum)]
+pub enum AppEnv {
+    Development,
+    Testing,
+    Production,
+}
+
 /// Application configuration loaded from environment variables or CLI flags.
 #[derive(clap::Parser, Clone)]
 pub struct Config {
+    #[clap(long, env = "APP_ENV", default_value = "development", value_enum)]
+    pub app_env: AppEnv,
     #[clap(long, env, default_value = "sqlite::memory:")]
     pub database_url: String,
     #[clap(long, env, default_value = "0.0.0.0:5000")]
@@ -34,6 +43,7 @@ pub struct Config {
 impl std::fmt::Debug for Config {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Config")
+            .field("app_env", &self.app_env)
             .field("database_url", &"[REDACTED]")
             .field("address", &self.address)
             .field("jwt_secret", &"[REDACTED]")

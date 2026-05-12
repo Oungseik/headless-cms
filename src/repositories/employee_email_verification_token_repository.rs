@@ -48,3 +48,18 @@ pub async fn find_by_hash<'e, E: sqlx::Executor<'e, Database = Sqlite>>(
     .fetch_optional(executor)
     .await
 }
+
+/// Delete all email verification tokens.
+///
+/// # Errors
+///
+/// Returns [`sqlx::Error`] if the delete fails.
+pub async fn delete_all<'e, E: sqlx::Executor<'e, Database = Sqlite>>(
+    executor: E,
+) -> Result<u64, sqlx::Error> {
+    let result = sqlx::query("DELETE FROM employee_email_verification_token")
+        .execute(executor)
+        .await?;
+
+    Ok(result.rows_affected())
+}

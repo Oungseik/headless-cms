@@ -109,7 +109,7 @@ pub async fn create_app() -> AppResult<Router> {
     });
 
     let health_route = features::health::router();
-    let dashboard_auth_route = features::dashboard_auth::router();
+    let dashboard_auth_route = features::dashboard_auth::router(&config.app_env);
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/health", health_route)

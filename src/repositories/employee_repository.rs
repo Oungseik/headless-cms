@@ -70,3 +70,22 @@ pub async fn insert<'e, E: sqlx::Executor<'e, Database = Sqlite>>(
 
     Ok(())
 }
+
+/// Set `email_verified_at` for all employees where it is `NULL`.
+///
+/// # Errors
+///
+/// Returns [`sqlx::Error`] if the update fails.
+pub async fn update_all_email_verified_at<'e, E: sqlx::Executor<'e, Database = Sqlite>>(
+    executor: E,
+    now: DateTime<Utc>,
+) -> Result<u64, sqlx::Error> {
+    let result = sqlx::query(
+        "UPDATE employee SET email_verified_at = $1, updated_at = $1 WHERE email_verified_at IS NULL",
+    )
+    .bind(now)
+    .execute(executor)
+    .await?;
+
+    Ok(result.rows_affected())
+}
