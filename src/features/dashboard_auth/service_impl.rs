@@ -3,7 +3,7 @@ use chrono::Utc;
 use entity::employee;
 use entity::employee_email_verification_token;
 use rand::Rng;
-use sea_orm::{DatabaseConnection, EntityTrait, PaginatorTrait, Set};
+use sea_orm::{DatabaseConnection, EntityTrait, PaginatorTrait, Set, TransactionTrait};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
@@ -23,14 +23,17 @@ impl DashboardAuthService for DashboardAuthServiceImpl {
         email: &'a str,
         password: &'a str,
     ) -> Result<(), DashboardAuthServiceError> {
-        let count = employee::Entity::find().count(&self.db).await?;
-
-        if count > 0 {
-            return Err(DashboardAuthServiceError::OwnerAlreadyExists);
-        }
-
         if password.len() < 8 {
             return Err(DashboardAuthServiceError::WeakPassword);
+        }
+
+        let txn = self.db.begin().await?;
+
+        let count = employee::Entity::find().count(&txn).await?;
+
+        if count > 0 {
+            txn.rollback().await?;
+            return Err(DashboardAuthServiceError::OwnerAlreadyExists);
         }
 
         let password_hash = bcrypt::hash(password, self.bcrypt_cost)
@@ -50,7 +53,7 @@ impl DashboardAuthService for DashboardAuthServiceImpl {
             updated_at: Set(now),
         };
 
-        employee::Entity::insert(employee).exec(&self.db).await?;
+        employee::Entity::insert(employee).exec(&txn).await?;
 
         let token_bytes: [u8; 32] = rand::thread_rng().r#gen();
         let token_hash = hex::encode(Sha256::digest(token_bytes));
@@ -67,8 +70,10 @@ impl DashboardAuthService for DashboardAuthServiceImpl {
         };
 
         employee_email_verification_token::Entity::insert(token)
-            .exec(&self.db)
+            .exec(&txn)
             .await?;
+
+        txn.commit().await?;
 
         Ok(())
     }

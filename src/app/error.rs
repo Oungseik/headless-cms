@@ -47,13 +47,6 @@ impl IntoResponse for AppError {
     }
 }
 
-impl From<sea_orm::DbErr> for AppError {
-    fn from(err: sea_orm::DbErr) -> Self {
-        tracing::error!("database error: {err}");
-        Self::InternalServerError
-    }
-}
-
 impl From<std::io::Error> for AppError {
     fn from(err: std::io::Error) -> Self {
         tracing::error!("io error: {err}");
