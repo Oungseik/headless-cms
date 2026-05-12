@@ -2,8 +2,11 @@ use std::error::Error;
 use std::sync::Arc;
 
 mod app;
+mod auth;
 mod config;
 mod features;
+mod models;
+mod repositories;
 
 use app::create_app;
 use config::get_config;

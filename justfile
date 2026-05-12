@@ -1,48 +1,29 @@
-# Run pending migrations via SeaORM
-up-migration:
-    cargo run -p migration
+# Run pending migrations
+migrate-run:
+    sqlx migrate run
 
 # Create a new migration
 migrate-create name:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-    MIGRATION_NAME="${TIMESTAMP}_{{name}}"
-    MIGRATION_FILE="migration/src/${MIGRATION_NAME}.rs"
-    echo "Creating migration: ${MIGRATION_NAME}"
+    sqlx migrate add {{name}}
 
-    cat > "${MIGRATION_FILE}" << 'RS_EOF'
-    use sea_orm_migration::prelude::*;
+# Generate offline query metadata for compile-time checks
+migrate-prepare:
+    cargo sqlx prepare
 
-    #[derive(DeriveMigrationName)]
-    pub struct Migration;
-
-    #[async_trait::async_trait]
-    impl MigrationTrait for Migration {
-        async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-            Ok(())
-        }
-
-        async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-            Ok(())
-        }
-    }
-    RS_EOF
-
-    echo "Created ${MIGRATION_FILE}"
-    echo "Don't forget to add the migration to migration/src/lib.rs"
+# Revert the last migration
+migrate-revert:
+    sqlx migrate revert
 
 # Run test server with release profile (for integration/performance testing via Hurl)
 test-server:
-    DATABASE_URL="sqlite::memory:?cache=shared" cargo run 
+    DATABASE_URL="sqlite::memory:?cache=shared" cargo run
 
 test-server-release:
-    DATABASE_URL="sqlite::memory:?cache=shared" cargo run --release 
+    DATABASE_URL="sqlite::memory:?cache=shared" cargo run --release
 
-# Run cargo check (both default and integration_testing features)
+# Run cargo check
 check:
     cargo check
-    cargo check --features integration_testing
 
 # Run cargo fmt
 fmt:

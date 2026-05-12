@@ -8,8 +8,7 @@ use std::sync::Arc;
 use axum::Router;
 use axum::http::{HeaderValue, Method};
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
-use migration::MigratorTrait;
-use sea_orm::DatabaseConnection;
+use sqlx::SqlitePool;
 use tower_http::cors::CorsLayer;
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
 use utoipa::{Modify, OpenApi};
@@ -44,14 +43,12 @@ impl Modify for SecurityAddon {
 /// Shared application state passed to all route handlers.
 #[derive(Clone)]
 pub struct AppState {
-    pub db: DatabaseConnection,
     pub dashboard_auth_service: Arc<dyn DashboardAuthService>,
 }
 
 impl std::fmt::Debug for AppState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AppState")
-            .field("db", &"DatabaseConnection")
             .field("dashboard_auth_service", &"Arc<dyn DashboardAuthService>")
             .finish()
     }
@@ -65,14 +62,14 @@ impl std::fmt::Debug for AppState {
 pub async fn create_app() -> AppResult<Router> {
     let config = get_config();
 
-    let db = sea_orm::Database::connect(&config.database_url)
+    let pool = SqlitePool::connect(&config.database_url)
         .await
         .map_err(|e| {
             tracing::error!("failed to connect to database: {e}");
             AppError::InternalServerError
         })?;
 
-    migration::Migrator::up(&db, None).await.map_err(|e| {
+    sqlx::migrate!().run(&pool).await.map_err(|e| {
         tracing::error!("failed to run migrations: {e}");
         AppError::InternalServerError
     })?;
@@ -95,13 +92,12 @@ pub async fn create_app() -> AppResult<Router> {
 
     let dashboard_auth_service: Arc<dyn DashboardAuthService> =
         Arc::new(DashboardAuthServiceImpl {
-            db: db.clone(),
+            pool,
             bcrypt_cost: config.bcrypt_cost,
             email_verification_token_ttl: config.email_verification_token_ttl,
         });
 
     let state = Arc::new(AppState {
-        db,
         dashboard_auth_service,
     });
 

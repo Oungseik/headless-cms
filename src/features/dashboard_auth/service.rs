@@ -7,7 +7,7 @@ pub enum DashboardAuthServiceError {
     #[error("password must be at least 8 characters")]
     WeakPassword,
     #[error("database error")]
-    Database(#[from] sea_orm::DbErr),
+    Database(#[from] sqlx::Error),
     #[error("password hashing failed")]
     PasswordHashing(#[from] bcrypt::BcryptError),
 }

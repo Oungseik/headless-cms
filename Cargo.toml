@@ -2,24 +2,24 @@
 name = "pos-backend"
 version = "0.1.0"
 edition = "2024"
-description = "A headless POS + CMS backend built with Axum and SeaORM"
+description = "A headless POS + CMS backend built with Axum"
 repository = "https://github.com/oungseik/pos-backend"
 
 [workspace]
 resolver = "3"
-members = ["entity", "migration"]
 
 [workspace.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.6.1", features = ["derive", "env"] }
 dotenvy = "0.15"
-sea-orm = { version = "1", features = [
-  "runtime-tokio-rustls",
-  "sqlx-sqlite",
-  "with-chrono",
-  "with-uuid",
-] }
 serde = { version = "1.0.228", features = ["derive"] }
+sqlx = { version = "0.8", features = [
+  "runtime-tokio-rustls",
+  "sqlite",
+  "chrono",
+  "uuid",
+  "migrate",
+] }
 tokio = { version = "1.52.1", features = ["macros", "rt-multi-thread", "signal"] }
 uuid = { version = "1", features = ["serde", "v7"] }
 
@@ -45,10 +45,8 @@ bcrypt = "0.17"
 chrono = { workspace = true }
 clap = { workspace = true }
 dotenvy = { workspace = true }
-entity = { path = "entity" }
 hex = "0.4"
 jsonwebtoken = "9"
-migration = { path = "migration" }
 opentelemetry = "0.31.0"
 opentelemetry-otlp = { version = "0.31.1", features = [
   "http-proto",
@@ -56,9 +54,9 @@ opentelemetry-otlp = { version = "0.31.1", features = [
 ] }
 opentelemetry_sdk = { version = "0.31.0", features = ["tokio"] }
 rand = "0.8"
-sea-orm = { workspace = true }
 serde = { workspace = true }
 sha2 = "0.10"
+sqlx = { workspace = true }
 thiserror = "2"
 tokio = { workspace = true }
 tower-http = { version = "0.6.8", features = ["cors"] }
