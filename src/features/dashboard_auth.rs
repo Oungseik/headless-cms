@@ -3,6 +3,8 @@
 pub mod register;
 pub mod service;
 pub mod service_impl;
+#[cfg(test)]
+pub mod test_utils;
 pub mod test_verify_all;
 
 use std::sync::Arc;

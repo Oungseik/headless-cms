@@ -83,3 +83,45 @@ impl DashboardAuthService for DashboardAuthServiceImpl {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::features::dashboard_auth::{
+        service::DashboardAuthServiceError, test_utils::setup_service,
+    };
+
+    #[tokio::test]
+    async fn register_should_fail_when_password_too_short() {
+        let service = setup_service().await;
+        let result = service.register("owner@example.com", "short").await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            DashboardAuthServiceError::WeakPassword
+        ));
+    }
+
+    #[tokio::test]
+    async fn register_should_succeed_with_valid_input() {
+        let service = setup_service().await;
+        let result = service.register("owner@example.com", "password1234").await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn register_should_fail_when_owner_already_exists() {
+        let service = setup_service().await;
+        service
+            .register("owner@example.com", "password1234")
+            .await
+            .expect("first registration should succeed");
+
+        let result = service.register("other@example.com", "password1234").await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            DashboardAuthServiceError::OwnerAlreadyExists
+        ));
+    }
+}

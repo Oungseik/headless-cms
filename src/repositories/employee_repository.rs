@@ -34,7 +34,7 @@ pub async fn count_all<'e, E: sqlx::Executor<'e, Database = Sqlite>>(
 /// # Errors
 ///
 /// Returns [`sqlx::Error`] if the query fails.
-#[expect(dead_code, reason = "will be used by login handler")]
+#[cfg_attr(not(test), expect(dead_code, reason = "will be used by login handler"))]
 pub async fn find_by_email<'e, E: sqlx::Executor<'e, Database = Sqlite>>(
     executor: E,
     email: &str,

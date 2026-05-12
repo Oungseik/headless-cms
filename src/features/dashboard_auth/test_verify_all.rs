@@ -44,22 +44,7 @@ pub async fn handler(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::features::dashboard_auth::service_impl::DashboardAuthServiceImpl;
-
-    async fn setup_service() -> DashboardAuthServiceImpl {
-        let pool = sqlx::SqlitePool::connect("sqlite::memory:")
-            .await
-            .expect("failed to connect to in-memory sqlite");
-        sqlx::migrate!()
-            .run(&pool)
-            .await
-            .expect("failed to run migrations");
-        DashboardAuthServiceImpl {
-            pool,
-            bcrypt_cost: 4,
-            email_verification_token_ttl: 86400,
-        }
-    }
+    use crate::features::dashboard_auth::test_utils::setup_service;
 
     #[tokio::test]
     async fn verify_all_should_mark_employee_as_verified() {

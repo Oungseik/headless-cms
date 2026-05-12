@@ -28,26 +28,21 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         .with_resource(resource)
         .build();
 
+    let tracer = provider.tracer(SERVICE_NAME);
+    let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+    let subscriber = Registry::default().with(telemetry);
+
     #[cfg(debug_assertions)]
-    {
+    let subscriber = {
         let fmt_layer = tracing_subscriber::fmt::layer()
             .with_target(false)
             .with_thread_ids(true)
             .with_line_number(true)
             .with_level(true);
-        let tracer = provider.tracer(SERVICE_NAME);
-        let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-        let subscriber = Registry::default().with(telemetry).with(fmt_layer);
-        tracing::subscriber::set_global_default(subscriber)?;
-    }
+        subscriber.with(fmt_layer)
+    };
 
-    #[cfg(not(debug_assertions))]
-    {
-        let tracer = provider.tracer(SERVICE_NAME);
-        let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-        let subscriber = Registry::default().with(telemetry);
-        tracing::subscriber::set_global_default(subscriber)?;
-    }
+    tracing::subscriber::set_global_default(subscriber)?;
 
     let root = span!(tracing::Level::INFO, "app_start");
     let _enter = root.enter();
