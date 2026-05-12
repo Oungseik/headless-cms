@@ -1,27 +1,43 @@
-use sea_query::Iden;
+use chrono::{DateTime, Utc};
+use sea_orm::entity::prelude::*;
 use uuid::Uuid;
 
-/// Column identifiers for the `employee_refresh_token` table.
-#[derive(Iden)]
-#[expect(missing_docs, reason = "variants mirror database column names")]
-pub enum EmployeeRefreshToken {
-    Table,
-    Id,
-    EmployeeId,
-    TokenHash,
-    ExpiresAt,
-    RevokedAt,
-    CreatedAt,
+/// Refresh token model for session management.
+#[derive(Clone, Debug, Eq, PartialEq, DeriveEntityModel)]
+#[sea_orm(table_name = "employee_refresh_token")]
+pub struct Model {
+    /// Primary key — UUID v7 stored as text.
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub id: Uuid,
+    /// FK to employee.
+    pub employee_id: Uuid,
+    /// SHA-256 hash of the raw token.
+    pub token_hash: String,
+    /// Token expiry timestamp.
+    pub expires_at: DateTime<Utc>,
+    /// Timestamp when the token was revoked, if ever.
+    pub revoked_at: Option<DateTime<Utc>>,
+    /// Row creation timestamp.
+    pub created_at: DateTime<Utc>,
 }
 
-/// A row from the `employee_refresh_token` table.
-#[derive(sqlx::FromRow, Debug, Clone)]
-#[expect(missing_docs, reason = "fields mirror database columns")]
-pub struct EmployeeRefreshTokenRow {
-    pub id: Uuid,
-    pub employee_id: Uuid,
-    pub token_hash: String,
-    pub expires_at: chrono::DateTime<chrono::Utc>,
-    pub revoked_at: Option<chrono::DateTime<chrono::Utc>>,
-    pub created_at: chrono::DateTime<chrono::Utc>,
+/// Refresh token entity (table definition).
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {
+    /// Belongs to an employee.
+    #[sea_orm(
+        belongs_to = "super::employee::Entity",
+        from = "Column::EmployeeId",
+        to = "super::employee::Column::Id",
+        on_delete = "Cascade"
+    )]
+    Employee,
 }
+
+impl Related<super::employee::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Employee.def()
+    }
+}
+
+impl ActiveModelBehavior for ActiveModel {}

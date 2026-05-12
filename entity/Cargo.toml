@@ -5,9 +5,8 @@ edition = "2024"
 
 [dependencies]
 chrono = { workspace = true }
-sea-query = { workspace = true }
+sea-orm = { workspace = true }
 serde = { workspace = true }
-sqlx = { workspace = true }
 uuid = { workspace = true }
 
 [lints]

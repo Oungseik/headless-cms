@@ -8,8 +8,8 @@ use std::sync::Arc;
 use axum::Router;
 use axum::http::{HeaderValue, Method};
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
-use sqlx::SqlitePool;
-use sqlx::sqlite::SqlitePoolOptions;
+use migration::MigratorTrait;
+use sea_orm::DatabaseConnection;
 use tower_http::cors::CorsLayer;
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
 use utoipa::{Modify, OpenApi};
@@ -19,6 +19,8 @@ use utoipa_swagger_ui::SwaggerUi;
 use crate::app::error::{AppError, AppResult};
 use crate::config::get_config;
 use crate::features;
+use crate::features::dashboard_auth::service::DashboardAuthService;
+use crate::features::dashboard_auth::service_impl::DashboardAuthServiceImpl;
 
 /// `OpenAPI` documentation specification.
 #[derive(OpenApi)]
@@ -42,13 +44,15 @@ impl Modify for SecurityAddon {
 /// Shared application state passed to all route handlers.
 #[derive(Clone)]
 pub struct AppState {
-    pub db: SqlitePool,
+    pub db: DatabaseConnection,
+    pub dashboard_auth_service: Arc<dyn DashboardAuthService>,
 }
 
 impl std::fmt::Debug for AppState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AppState")
-            .field("db", &"SqlitePool")
+            .field("db", &"DatabaseConnection")
+            .field("dashboard_auth_service", &"Arc<dyn DashboardAuthService>")
             .finish()
     }
 }
@@ -61,21 +65,17 @@ impl std::fmt::Debug for AppState {
 pub async fn create_app() -> AppResult<Router> {
     let config = get_config();
 
-    let pool = SqlitePoolOptions::new()
-        .connect(&config.database_url)
+    let db = sea_orm::Database::connect(&config.database_url)
         .await
         .map_err(|e| {
             tracing::error!("failed to connect to database: {e}");
             AppError::InternalServerError
         })?;
 
-    sqlx::migrate!("./migrations")
-        .run(&pool)
-        .await
-        .map_err(|e| {
-            tracing::error!("failed to run migrations: {e}");
-            AppError::InternalServerError
-        })?;
+    migration::Migrator::up(&db, None).await.map_err(|e| {
+        tracing::error!("failed to run migrations: {e}");
+        AppError::InternalServerError
+    })?;
 
     let cors_origins: Vec<_> = config
         .allowed_origins
@@ -93,7 +93,17 @@ pub async fn create_app() -> AppResult<Router> {
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_origin(cors_origins);
 
-    let state = Arc::new(AppState { db: pool });
+    let dashboard_auth_service: Arc<dyn DashboardAuthService> =
+        Arc::new(DashboardAuthServiceImpl {
+            db: db.clone(),
+            bcrypt_cost: config.bcrypt_cost,
+            email_verification_token_ttl: config.email_verification_token_ttl,
+        });
+
+    let state = Arc::new(AppState {
+        db,
+        dashboard_auth_service,
+    });
 
     let health_route = features::health::router();
     let dashboard_auth_route = features::dashboard_auth::router();

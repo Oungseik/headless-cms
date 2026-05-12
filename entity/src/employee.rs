@@ -1,31 +1,51 @@
-use sea_query::Iden;
+use chrono::{DateTime, Utc};
+use sea_orm::entity::prelude::*;
 use uuid::Uuid;
 
-/// Column identifiers for the `employee` table, used with [`SeaQuery`](sea_query).
-#[derive(Iden)]
-#[expect(missing_docs, reason = "variants mirror database column names")]
-pub enum Employee {
-    Table,
-    Id,
-    Email,
-    PasswordHash,
-    Role,
-    IsActive,
-    EmailVerifiedAt,
-    CreatedAt,
-    UpdatedAt,
+/// Employee account model.
+#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+#[sea_orm(table_name = "employee")]
+pub struct Model {
+    /// Primary key — UUID v7 stored as text.
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub id: Uuid,
+    /// Unique email address.
+    pub email: String,
+    /// Bcrypt password hash.
+    pub password_hash: String,
+    /// Role (e.g. `owner`).
+    pub role: String,
+    /// Whether the account is active.
+    pub is_active: bool,
+    /// Timestamp when email was verified, if ever.
+    pub email_verified_at: Option<DateTime<Utc>>,
+    /// Row creation timestamp.
+    pub created_at: DateTime<Utc>,
+    /// Row last-updated timestamp.
+    pub updated_at: DateTime<Utc>,
 }
 
-/// A row from the `employee` table.
-#[derive(sqlx::FromRow, Debug, Clone)]
-#[expect(missing_docs, reason = "fields mirror database columns")]
-pub struct EmployeeRow {
-    pub id: Uuid,
-    pub email: String,
-    pub password_hash: String,
-    pub role: String,
-    pub is_active: bool,
-    pub email_verified_at: Option<chrono::DateTime<chrono::Utc>>,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub updated_at: chrono::DateTime<chrono::Utc>,
+/// Employee entity (table definition).
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {
+    /// An employee has many refresh tokens.
+    #[sea_orm(has_many = "super::employee_refresh_token::Entity")]
+    EmployeeRefreshToken,
+    /// An employee has many email verification tokens.
+    #[sea_orm(has_many = "super::employee_email_verification_token::Entity")]
+    EmployeeEmailVerificationToken,
 }
+
+impl Related<super::employee_refresh_token::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::EmployeeRefreshToken.def()
+    }
+}
+
+impl Related<super::employee_email_verification_token::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::EmployeeEmailVerificationToken.def()
+    }
+}
+
+impl ActiveModelBehavior for ActiveModel {}

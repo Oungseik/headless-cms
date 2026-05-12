@@ -2,9 +2,7 @@
 
 //! Database entity definitions for the POS + CMS backend.
 //!
-//! Contains [`SeaQuery`](sea_query) [`Iden`](sea_query::Iden) enums for schema-aware
-//! query building and [`SQLx`](sqlx) `FromRow` structs for mapping query results
-//! to Rust types.
+//! Contains [`SeaORM`](sea_orm) entity definitions for database tables.
 
 /// Employee account entity.
 pub mod employee;

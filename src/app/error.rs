@@ -21,7 +21,7 @@ pub enum AppError {
     InternalServerError,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct ErrorResponse {
     pub error: String,
     pub message: String,
@@ -47,8 +47,8 @@ impl IntoResponse for AppError {
     }
 }
 
-impl From<sqlx::Error> for AppError {
-    fn from(err: sqlx::Error) -> Self {
+impl From<sea_orm::DbErr> for AppError {
+    fn from(err: sea_orm::DbErr) -> Self {
         tracing::error!("database error: {err}");
         Self::InternalServerError
     }
@@ -58,5 +58,27 @@ impl From<std::io::Error> for AppError {
     fn from(err: std::io::Error) -> Self {
         tracing::error!("io error: {err}");
         Self::InternalServerError
+    }
+}
+
+impl From<crate::features::dashboard_auth::service::DashboardAuthServiceError> for AppError {
+    fn from(err: crate::features::dashboard_auth::service::DashboardAuthServiceError) -> Self {
+        use crate::features::dashboard_auth::service::DashboardAuthServiceError as E;
+        match err {
+            E::OwnerAlreadyExists => {
+                Self::Conflict("An owner has already been registered".to_string())
+            }
+            E::WeakPassword => {
+                Self::BadRequest("Password must be at least 8 characters".to_string())
+            }
+            E::Database(e) => {
+                tracing::error!("database error: {e}");
+                Self::InternalServerError
+            }
+            E::PasswordHashing(e) => {
+                tracing::error!("password hashing failed: {e}");
+                Self::InternalServerError
+            }
+        }
     }
 }

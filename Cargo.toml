@@ -2,32 +2,24 @@
 name = "pos-backend"
 version = "0.1.0"
 edition = "2024"
-description = "A headless POS + CMS backend built with Axum and SeaQuery + SQLx"
+description = "A headless POS + CMS backend built with Axum and SeaORM"
 repository = "https://github.com/oungseik/pos-backend"
 
 [workspace]
 resolver = "3"
-members = ["entity"]
+members = ["entity", "migration"]
 
 [workspace.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.6.1", features = ["derive", "env"] }
-sea-query = { version = "=1.0.0-rc.34", features = [
-  "backend-sqlite",
-  "derive",
-  "with-uuid",
-] }
-sea-query-sqlx = { version = "=0.8.0-rc.16", features = [
+dotenvy = "0.15"
+sea-orm = { version = "1", features = [
+  "runtime-tokio-rustls",
   "sqlx-sqlite",
+  "with-chrono",
   "with-uuid",
 ] }
 serde = { version = "1.0.228", features = ["derive"] }
-sqlx = { version = "0.8", features = [
-  "chrono",
-  "runtime-tokio-rustls",
-  "sqlite",
-  "uuid",
-] }
 tokio = { version = "1.52.1", features = ["macros", "rt-multi-thread", "signal"] }
 uuid = { version = "1", features = ["serde", "v7"] }
 
@@ -52,10 +44,11 @@ axum-tracing-opentelemetry = "0.33.1"
 bcrypt = "0.17"
 chrono = { workspace = true }
 clap = { workspace = true }
-dotenvy = "0.15"
+dotenvy = { workspace = true }
 entity = { path = "entity" }
 hex = "0.4"
 jsonwebtoken = "9"
+migration = { path = "migration" }
 opentelemetry = "0.31.0"
 opentelemetry-otlp = { version = "0.31.1", features = [
   "http-proto",
@@ -63,11 +56,9 @@ opentelemetry-otlp = { version = "0.31.1", features = [
 ] }
 opentelemetry_sdk = { version = "0.31.0", features = ["tokio"] }
 rand = "0.8"
-sea-query = { workspace = true }
-sea-query-sqlx = { workspace = true }
+sea-orm = { workspace = true }
 serde = { workspace = true }
 sha2 = "0.10"
-sqlx = { workspace = true }
 thiserror = "2"
 tokio = { workspace = true }
 tower-http = { version = "0.6.8", features = ["cors"] }
@@ -80,5 +71,6 @@ utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 uuid = { workspace = true }
 
 [dev-dependencies]
+
 [lints]
 workspace = true

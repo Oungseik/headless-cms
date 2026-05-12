@@ -1,24 +1,8 @@
-# Generate .sql files from SeaQuery migration definitions
-generate-migration:
-    cargo run -p migration -- --output migrations/
-
-# Run pending migrations via sqlx-cli
+# Run pending migrations via SeaORM
 up-migration:
-    sqlx migrate run --source migrations/
+    cargo run -p migration
 
-# Revert last migration
-down-migration:
-    sqlx migrate revert --source migrations/
-
-# Revert all migrations
-reset-migration:
-    sqlx migrate revert --source migrations/ --target-version 0
-
-# Check migration status
-migrate-status:
-    sqlx migrate info --source migrations/
-
-# Create a new migration (interactive)
+# Create a new migration
 migrate-create name:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -28,14 +12,20 @@ migrate-create name:
     echo "Creating migration: ${MIGRATION_NAME}"
 
     cat > "${MIGRATION_FILE}" << 'RS_EOF'
-    use sea_query::{SqliteQueryBuilder, Table};
+    use sea_orm_migration::prelude::*;
 
-    pub fn up() -> Vec<String> {
-        vec![]
-    }
+    #[derive(DeriveMigrationName)]
+    pub struct Migration;
 
-    pub fn down() -> Vec<String> {
-        vec![]
+    #[async_trait::async_trait]
+    impl MigrationTrait for Migration {
+        async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+            Ok(())
+        }
+
+        async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+            Ok(())
+        }
     }
     RS_EOF
 
