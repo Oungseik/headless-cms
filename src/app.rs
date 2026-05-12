@@ -11,6 +11,7 @@ use axum::{
 };
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
 use sqlx::SqlitePool;
+use tower_governor::governor::GovernorConfigBuilder;
 use tower_http::cors::CorsLayer;
 use utoipa::{
     Modify, OpenApi,
@@ -87,6 +88,16 @@ pub async fn create_app() -> AppResult<Router> {
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_origin(cors_origins);
 
+    let governor_conf = if config.rate_limit_enabled {
+        GovernorConfigBuilder::default()
+            .per_second(config.rate_limit_per_second)
+            .burst_size(config.rate_limit_burst)
+            .use_headers()
+            .finish()
+    } else {
+        None
+    };
+
     let dashboard_auth_service = DashboardAuthServiceImpl {
         pool,
         bcrypt_cost: config.bcrypt_cost,
@@ -107,11 +118,17 @@ pub async fn create_app() -> AppResult<Router> {
         .split_for_parts();
 
     let swagger = SwaggerUi::new("/api-docs/swagger-ui").url("/api-docs/openapi.json", api);
+    let router = router.merge(swagger).layer(cors);
+
+    let router = if let Some(governor_conf) = governor_conf {
+        router.layer(tower_governor::GovernorLayer::new(Arc::new(governor_conf)))
+    } else {
+        router
+    };
+
     let router = router
-        .merge(swagger)
         .layer(OtelInResponseLayer)
-        .layer(OtelAxumLayer::default())
-        .layer(cors);
+        .layer(OtelAxumLayer::default());
 
     Ok(router)
 }

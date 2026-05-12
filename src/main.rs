@@ -1,4 +1,4 @@
-use std::{error::Error, sync::Arc};
+use std::{error::Error, net::SocketAddr, sync::Arc};
 
 mod app;
 mod auth;
@@ -59,9 +59,12 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let provider = Arc::new(provider);
     let shutdown_provider = provider.clone();
 
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
 
     shutdown_provider.shutdown()?;
     Ok(())

@@ -23,6 +23,12 @@ pub struct Config {
     pub email_verification_token_ttl: u64,
     #[clap(long, env, default_value_t = 12)]
     pub bcrypt_cost: u32,
+    #[clap(long, env, default_value_t = true)]
+    pub rate_limit_enabled: bool,
+    #[clap(long, env, default_value_t = 10)]
+    pub rate_limit_per_second: u64,
+    #[clap(long, env, default_value_t = 10)]
+    pub rate_limit_burst: u32,
 }
 
 impl std::fmt::Debug for Config {
@@ -40,6 +46,9 @@ impl std::fmt::Debug for Config {
                 &self.email_verification_token_ttl,
             )
             .field("bcrypt_cost", &self.bcrypt_cost)
+            .field("rate_limit_enabled", &self.rate_limit_enabled)
+            .field("rate_limit_per_second", &self.rate_limit_per_second)
+            .field("rate_limit_burst", &self.rate_limit_burst)
             .finish()
     }
 }
