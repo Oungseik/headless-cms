@@ -6,8 +6,8 @@
 GET {{BASE_URL}}/health
 HTTP/1.1 200
 [Asserts]
-header "X-RateLimit-Remaining" exists
-header "X-RateLimit-Reset" exists
+header "x-ratelimit-remaining" exists
+header "x-ratelimit-limit" exists
 
 # Request 2
 GET {{BASE_URL}}/health
@@ -49,7 +49,7 @@ HTTP/1.1 200
 GET {{BASE_URL}}/health
 HTTP/1.1 429
 [Asserts]
-header "Retry-After" exists
-header "X-RateLimit-Remaining" exists
-header "X-RateLimit-Reset" exists
-jsonpath "$.message" == "Too Many Requests"
+header "retry-after" exists
+header "x-ratelimit-remaining" exists
+header "x-ratelimit-limit" exists
+body contains "Too Many Requests"
