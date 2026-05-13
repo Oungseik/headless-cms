@@ -166,6 +166,14 @@ impl DashboardAuthService for DashboardAuthServiceImpl {
         })
     }
 
+    async fn logout(&self, token: &str) -> Result<(), DashboardAuthServiceError> {
+        let raw = hex::decode(token).map_err(|_| DashboardAuthServiceError::InvalidCredentials)?;
+        let token_hash = auth::token::hash(&raw);
+        let now = Utc::now();
+        employee_refresh_token_repository::revoke(&self.pool, &token_hash, now).await?;
+        Ok(())
+    }
+
     async fn verify_all(&self) -> Result<(), DashboardAuthServiceError> {
         let now = Utc::now();
         let mut txn = self.pool.begin().await?;
@@ -319,5 +327,67 @@ mod tests {
         assert!(!login_result.access_token.is_empty());
         assert!(!login_result.refresh_token.is_empty());
         assert_eq!(login_result.expires_in, 900);
+    }
+
+    #[tokio::test]
+    async fn logout_should_succeed_with_valid_token() {
+        let service = setup_service().await;
+        service
+            .register("owner@example.com", "password1234")
+            .await
+            .expect("registration should succeed");
+
+        service
+            .verify_all()
+            .await
+            .expect("verify_all should succeed");
+
+        let login_result = service
+            .login("owner@example.com", "password1234")
+            .await
+            .expect("login should succeed");
+
+        let hex_token = hex::encode(&login_result.refresh_token);
+        let result = service.logout(&hex_token).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn logout_should_succeed_with_invalid_token() {
+        let service = setup_service().await;
+        let result = service.logout("not-a-valid-hex").await;
+        assert!(matches!(
+            result.unwrap_err(),
+            DashboardAuthServiceError::InvalidCredentials
+        ));
+    }
+
+    #[tokio::test]
+    async fn logout_should_succeed_with_already_revoked_token() {
+        let service = setup_service().await;
+        service
+            .register("owner@example.com", "password1234")
+            .await
+            .expect("registration should succeed");
+
+        service
+            .verify_all()
+            .await
+            .expect("verify_all should succeed");
+
+        let login_result = service
+            .login("owner@example.com", "password1234")
+            .await
+            .expect("login should succeed");
+
+        let hex_token = hex::encode(&login_result.refresh_token);
+
+        service
+            .logout(&hex_token)
+            .await
+            .expect("first logout should succeed");
+
+        let result = service.logout(&hex_token).await;
+        assert!(result.is_ok());
     }
 }

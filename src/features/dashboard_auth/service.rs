@@ -50,6 +50,11 @@ pub trait DashboardAuthService: Send + Sync + 'static {
         password: &str,
     ) -> Result<LoginResult, DashboardAuthServiceError>;
 
+    /// Revokes a refresh token so it can no longer be used.
+    ///
+    /// Always succeeds, even if the token is invalid or already revoked.
+    async fn logout(&self, token: &str) -> Result<(), DashboardAuthServiceError>;
+
     /// Marks all employees as email-verified and deletes all verification tokens.
     ///
     /// Intended for testing only.

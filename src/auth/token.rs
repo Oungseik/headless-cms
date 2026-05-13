@@ -8,7 +8,6 @@ pub fn generate() -> ([u8; 32], String) {
 }
 
 /// Hash raw token bytes with SHA-256 and return the hex-encoded hash.
-#[expect(dead_code, reason = "will be used by token refresh handler")]
 pub fn hash(raw: &[u8]) -> String {
     hex::encode(Sha256::digest(raw))
 }
