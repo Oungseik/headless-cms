@@ -1,28 +1,69 @@
 # POS Backend
 
-A headless POS + CMS backend built with Axum, SeaORM, and preconfigured OpenAPI, OpenTelemetry.
+A headless POS + CMS backend built with Axum, sqlx, and preconfigured OpenAPI, OpenTelemetry.
 
-## Table of Contents
+## Tech Stack
 
-1. [Project Overview](#project-overview)
-2. [Usage](#usage)
+- [**Axum**](https://github.com/tokio-rs/axum) -- async web framework
+- [**sqlx**](https://github.com/launchbadge/sqlx) -- async SQL toolkit (SQLite)
+- [**Utoipa**](https://github.com/juhaku/utoipa) -- OpenAPI spec generation + Swagger UI
+- [**OpenTelemetry**](https://opentelemetry.io/) -- distributed tracing (OTLP export)
+- [**tower_governor**](https://github.com/benwis/tower_governor) -- rate limiting
+- **jsonwebtoken** + **bcrypt** -- JWT auth and password hashing
 
-## Project Overview
+## API Endpoints
 
-A headless POS + CMS backend for managing products, orders, and content via API, built with the following technologies:
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health/` | Health check |
+| `POST` | `/api/v1/dashboard/auth/register` | Register first owner account |
+| `POST` | `/api/v1/dashboard/auth/login` | Login, returns JWT + refresh token |
+| `POST` | `/api/v1/dashboard/auth/test/verify-all` | Test-only: verify all emails (when `APP_ENV=testing`) |
 
-- [**Axum**](https://github.com/tokio-rs/axum): A web framework for building robust and scalable web applications.
-- [**SeaORM**](https://github.com/SeaQL/sea-orm): An async ORM built on top of sqlx for interacting with databases.
-- [**Utoipa**](https://github.com/juhaku/utoipa): Documentation and specification for APIs.
-- **OpenTelemetry**: Observability tools for monitoring and tracing.
+Swagger UI at `/api-docs/swagger-ui`.
 
-## Usage
+## Getting Started
 
-Change the database url in the [flake.nix](./flake.nix) or update it in the `.env` if you are not using Nix.
+Prerequisites: Rust toolchain, SQLite. Optionally use [Nix](https://nixos.org/) for a reproducible dev shell.
 
-If you want to use Postgres, update the database URL and enable the `sqlx-postgres` feature on the `sea-orm` dependency.
+```sh
+nix develop          # optional, provides all tools
+just migrate-run     # run pending migrations
+cargo run            # start the server
+```
 
-Configurations are loaded in the [config.rs](./src/config.rs) and share across the app.
+## Testing
 
-Can collect the traces simply with [otel-desktop-viewer](https://github.com/CtrlSpice/otel-desktop-viewer).
+```sh
+just verify          # format + lint + tests (full CI)
+cargo test --all     # unit tests only
+```
 
+For E2E tests with [Hurl](https://hurl.dev/):
+
+```sh
+just test-server                                    # terminal 1: in-memory SQLite server
+hurl --test tests/hurl_e2e/**/*.hurl                # terminal 2: run E2E tests
+```
+
+## Dev Commands
+
+| Command | Description |
+|---------|-------------|
+| `just verify` | Format + lint + test |
+| `just test` | Run all tests |
+| `just lint` | Clippy strict |
+| `just fmt` | Format code |
+| `just check` | Cargo check |
+| `just migrate-run` | Run pending migrations |
+| `just migrate-create <name>` | Create a new migration |
+| `just migrate-revert` | Revert last migration |
+| `just test-server` | Start in-memory server for E2E |
+
+## Configuration
+
+Config loaded in [config.rs](./src/config.rs) via `clap` from `.env`, env vars, and CLI flags.
+
+Key settings: `APP_ENV`, `DATABASE_URL`, `JWT_SECRET`, `LISTEN_ADDR`, `ALLOWED_ORIGINS`, `RATE_LIMIT_ENABLED`, `BCRYPT_COST`.
+
+Traces via [otel-desktop-viewer](https://github.com/CtrlSpice/otel-desktop-viewer) or any OTLP backend.
