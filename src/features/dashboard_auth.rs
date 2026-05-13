@@ -9,6 +9,7 @@ pub mod service_impl;
 #[cfg(test)]
 pub mod test_utils;
 pub mod test_verify_all;
+pub mod verify_email;
 
 use std::sync::Arc;
 
@@ -22,7 +23,8 @@ pub fn router(app_env: &AppEnv) -> OpenApiRouter<Arc<AppState>> {
         .routes(routes!(register::handler))
         .routes(routes!(login::handler))
         .routes(routes!(logout::handler))
-        .routes(routes!(refresh::handler));
+        .routes(routes!(refresh::handler))
+        .routes(routes!(verify_email::handler));
 
     if *app_env == AppEnv::Testing {
         router.routes(routes!(test_verify_all::handler))

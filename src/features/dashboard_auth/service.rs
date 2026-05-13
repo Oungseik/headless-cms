@@ -10,6 +10,12 @@ pub enum DashboardAuthServiceError {
     EmailNotVerified,
     #[error("account is inactive")]
     AccountInactive,
+    #[error("invalid or expired verification token")]
+    InvalidVerificationToken,
+    #[error("email already verified")]
+    EmailAlreadyVerified,
+    #[error("account not found")]
+    AccountNotFound,
     #[error("database error")]
     Database(#[from] sqlx::Error),
     #[error("password hashing failed")]
@@ -68,4 +74,12 @@ pub trait DashboardAuthService: Send + Sync + 'static {
     ///
     /// Intended for testing only.
     async fn verify_all(&self) -> Result<(), DashboardAuthServiceError>;
+
+    /// Verifies an email using a raw token from the verification link.
+    ///
+    /// Fails with [`DashboardAuthServiceError::InvalidVerificationToken`] if the
+    /// token is not found or expired, [`DashboardAuthServiceError::EmailAlreadyVerified`]
+    /// if the email was already verified, or [`DashboardAuthServiceError::AccountNotFound`]
+    /// if the employee no longer exists.
+    async fn verify_email(&self, token: &str) -> Result<(), DashboardAuthServiceError>;
 }

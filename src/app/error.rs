@@ -7,7 +7,6 @@ use serde::Serialize;
 pub type AppResult<T> = Result<T, AppError>;
 
 #[derive(Debug, thiserror::Error)]
-#[expect(dead_code, reason = "variants will be used by future handlers")]
 pub enum AppError {
     #[error("bad request: {0}")]
     BadRequest(String),
@@ -68,6 +67,11 @@ impl From<crate::features::dashboard_auth::service::DashboardAuthServiceError> f
             }
             E::InvalidCredentials => Self::Unauthorized,
             E::AccountInactive | E::EmailNotVerified => Self::Forbidden,
+            E::InvalidVerificationToken => {
+                Self::BadRequest("Invalid or expired verification token".to_string())
+            }
+            E::EmailAlreadyVerified => Self::Conflict("Email already verified".to_string()),
+            E::AccountNotFound => Self::NotFound,
             E::Database(e) => {
                 tracing::error!("database error: {e}");
                 Self::InternalServerError

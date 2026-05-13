@@ -227,6 +227,52 @@ impl DashboardAuthService for DashboardAuthServiceImpl {
 
         Ok(())
     }
+
+    async fn verify_email(&self, token: &str) -> Result<(), DashboardAuthServiceError> {
+        let raw =
+            hex::decode(token).map_err(|_| DashboardAuthServiceError::InvalidVerificationToken)?;
+        let token_hash = auth::token::hash(&raw);
+        let now = Utc::now();
+
+        let mut txn = self.pool.begin().await?;
+
+        let verification_token =
+            employee_email_verification_token_repository::find_by_hash(&mut *txn, &token_hash)
+                .await?
+                .ok_or(DashboardAuthServiceError::InvalidVerificationToken)?;
+
+        if verification_token.expires_at < now {
+            employee_email_verification_token_repository::delete_by_employee_id(
+                &mut *txn,
+                verification_token.employee_id,
+            )
+            .await?;
+            txn.commit().await?;
+            return Err(DashboardAuthServiceError::InvalidVerificationToken);
+        }
+
+        let employee = employee_repository::find_by_id(&mut *txn, verification_token.employee_id)
+            .await?
+            .ok_or(DashboardAuthServiceError::AccountNotFound)?;
+
+        if employee.email_verified_at.is_some() {
+            employee_email_verification_token_repository::delete_by_employee_id(
+                &mut *txn,
+                employee.id,
+            )
+            .await?;
+            txn.commit().await?;
+            return Err(DashboardAuthServiceError::EmailAlreadyVerified);
+        }
+
+        employee_repository::update_email_verified_at(&mut *txn, employee.id, now).await?;
+        employee_email_verification_token_repository::delete_by_employee_id(&mut *txn, employee.id)
+            .await?;
+
+        txn.commit().await?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -603,6 +649,155 @@ mod tests {
         assert!(matches!(
             result.unwrap_err(),
             DashboardAuthServiceError::InvalidCredentials
+        ));
+    }
+
+    /// Helper: register a user, delete the auto-generated token, insert a known
+    /// token, and return the raw token bytes (hex-encoded) and the employee id.
+    async fn register_with_known_token(service: &DashboardAuthServiceImpl) -> (String, Uuid) {
+        service
+            .register("owner@example.com", "password1234")
+            .await
+            .expect("registration should succeed");
+
+        let employee = employee_repository::find_by_email(&service.pool, "owner@example.com")
+            .await
+            .unwrap()
+            .unwrap();
+
+        // Delete auto-generated token
+        employee_email_verification_token_repository::delete_by_employee_id(
+            &service.pool,
+            employee.id,
+        )
+        .await
+        .unwrap();
+
+        // Insert a known token
+        let raw_token: [u8; 32] = rand::random();
+        let token_hash = auth::token::hash(&raw_token);
+        let now = Utc::now();
+        let ttl = i64::try_from(service.email_verification_token_ttl).unwrap_or(i64::MAX);
+        let expires_at = now + chrono::Duration::seconds(ttl);
+
+        employee_email_verification_token_repository::insert(
+            &service.pool,
+            Uuid::now_v7(),
+            employee.id,
+            &token_hash,
+            expires_at,
+            now,
+        )
+        .await
+        .unwrap();
+
+        (hex::encode(raw_token), employee.id)
+    }
+
+    #[tokio::test]
+    async fn verify_email_should_succeed_with_valid_token() {
+        let service = setup_service().await;
+        let (hex_token, employee_id) = register_with_known_token(&service).await;
+
+        let result = service.verify_email(&hex_token).await;
+        assert!(result.is_ok());
+
+        let employee = employee_repository::find_by_id(&service.pool, employee_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(employee.email_verified_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn verify_email_should_fail_with_invalid_hex_token() {
+        let service = setup_service().await;
+        let _ = register_with_known_token(&service).await;
+
+        let result = service.verify_email("not-valid-hex").await;
+        assert!(matches!(
+            result.unwrap_err(),
+            DashboardAuthServiceError::InvalidVerificationToken
+        ));
+    }
+
+    #[tokio::test]
+    async fn verify_email_should_fail_with_token_not_in_db() {
+        let service = setup_service().await;
+        let _ = register_with_known_token(&service).await;
+
+        // Random token that doesn't exist in DB
+        let fake_raw: [u8; 32] = rand::random();
+        let fake_hex = hex::encode(fake_raw);
+        let result = service.verify_email(&fake_hex).await;
+        assert!(matches!(
+            result.unwrap_err(),
+            DashboardAuthServiceError::InvalidVerificationToken
+        ));
+    }
+
+    #[tokio::test]
+    async fn verify_email_should_fail_with_expired_token() {
+        let service = setup_service().await;
+        let (hex_token, employee_id) = register_with_known_token(&service).await;
+
+        // Expire the token
+        let past = Utc::now() - chrono::Duration::hours(1);
+        sqlx::query(
+            "UPDATE employee_email_verification_token SET expires_at = ? WHERE employee_id = ?",
+        )
+        .bind(past)
+        .bind(employee_id)
+        .execute(&service.pool)
+        .await
+        .unwrap();
+
+        let result = service.verify_email(&hex_token).await;
+        assert!(matches!(
+            result.unwrap_err(),
+            DashboardAuthServiceError::InvalidVerificationToken
+        ));
+    }
+
+    #[tokio::test]
+    async fn verify_email_should_fail_when_already_verified() {
+        let service = setup_service().await;
+        let (hex_token, _) = register_with_known_token(&service).await;
+
+        // Verify once
+        service
+            .verify_email(&hex_token)
+            .await
+            .expect("first verify should succeed");
+
+        // Register again with a new token (need a fresh token since old one was deleted)
+        // Actually, the employee is already verified. Let's insert a new token for the same employee.
+        let employee = employee_repository::find_by_email(&service.pool, "owner@example.com")
+            .await
+            .unwrap()
+            .unwrap();
+
+        let raw_token: [u8; 32] = rand::random();
+        let token_hash = auth::token::hash(&raw_token);
+        let now = Utc::now();
+        let ttl = i64::try_from(service.email_verification_token_ttl).unwrap_or(i64::MAX);
+        let expires_at = now + chrono::Duration::seconds(ttl);
+
+        employee_email_verification_token_repository::insert(
+            &service.pool,
+            Uuid::now_v7(),
+            employee.id,
+            &token_hash,
+            expires_at,
+            now,
+        )
+        .await
+        .unwrap();
+
+        let result = service.verify_email(&hex::encode(raw_token)).await;
+        assert!(matches!(
+            result.unwrap_err(),
+            DashboardAuthServiceError::EmailAlreadyVerified
         ));
     }
 }
