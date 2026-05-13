@@ -66,7 +66,7 @@ pub fn encode(
 /// # Errors
 ///
 /// Returns [`JwtError`] if the token is invalid, expired, or cannot be decoded.
-#[expect(dead_code, reason = "will be used by token refresh handler")]
+#[expect(dead_code, reason = "will be used by /me endpoint or auth middleware")]
 pub fn decode(token: &str, secret: &[u8]) -> Result<Claims, JwtError> {
     let token_data = jsonwebtoken::decode::<Claims>(
         token,

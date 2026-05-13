@@ -29,6 +29,21 @@ pub async fn count_all<'e, E: sqlx::Executor<'e, Database = Sqlite>>(
         .await
 }
 
+/// Find an employee by ID.
+///
+/// # Errors
+///
+/// Returns [`sqlx::Error`] if the query fails.
+pub async fn find_by_id<'e, E: sqlx::Executor<'e, Database = Sqlite>>(
+    executor: E,
+    id: Uuid,
+) -> Result<Option<Employee>, sqlx::Error> {
+    sqlx::query_as::<_, Employee>("SELECT * FROM employee WHERE id = ?")
+        .bind(id)
+        .fetch_optional(executor)
+        .await
+}
+
 /// Find an employee by email.
 ///
 /// # Errors

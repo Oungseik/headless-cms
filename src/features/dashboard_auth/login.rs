@@ -34,9 +34,9 @@ impl std::fmt::Debug for LoginRequest {
     }
 }
 
-/// Response body for a successful login.
+/// Response body containing access and refresh tokens.
 #[derive(Serialize, ToSchema)]
-pub struct LoginResponse {
+pub struct TokenResponse {
     /// Signed JWT access token.
     pub access_token: String,
     /// Hex-encoded refresh token.
@@ -53,7 +53,7 @@ pub struct LoginResponse {
     operation_id = "dashboard_auth_login",
     request_body = LoginRequest,
     responses(
-        (status = 200, description = "login successful", body = LoginResponse),
+        (status = 200, description = "login successful", body = TokenResponse),
         (status = 401, description = "invalid credentials", body = ErrorResponse),
         (status = 403, description = "email not verified or account inactive", body = ErrorResponse),
     ),
@@ -63,7 +63,7 @@ pub struct LoginResponse {
 pub async fn handler(
     State(state): State<Arc<AppState>>,
     Json(body): Json<LoginRequest>,
-) -> AppResult<(StatusCode, Json<LoginResponse>)> {
+) -> AppResult<(StatusCode, Json<TokenResponse>)> {
     let result = state
         .dashboard_auth_service
         .login(&body.email, &body.password)
@@ -71,7 +71,7 @@ pub async fn handler(
 
     Ok((
         StatusCode::OK,
-        Json(LoginResponse {
+        Json(TokenResponse {
             access_token: result.access_token,
             refresh_token: hex::encode(result.refresh_token),
             token_type: "Bearer".to_string(),

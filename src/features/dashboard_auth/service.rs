@@ -55,6 +55,15 @@ pub trait DashboardAuthService: Send + Sync + 'static {
     /// Always succeeds, even if the token is invalid or already revoked.
     async fn logout(&self, token: &str) -> Result<(), DashboardAuthServiceError>;
 
+    /// Exchanges a valid refresh token for a new access + refresh token pair.
+    ///
+    /// The old refresh token is revoked (token rotation). Fails with
+    /// [`DashboardAuthServiceError::InvalidCredentials`] if the token is
+    /// invalid, expired, or already revoked, or
+    /// [`DashboardAuthServiceError::AccountInactive`] if the employee account
+    /// has been deactivated.
+    async fn refresh(&self, token: &str) -> Result<LoginResult, DashboardAuthServiceError>;
+
     /// Marks all employees as email-verified and deletes all verification tokens.
     ///
     /// Intended for testing only.

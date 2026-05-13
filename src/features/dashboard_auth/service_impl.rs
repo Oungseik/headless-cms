@@ -174,6 +174,48 @@ impl DashboardAuthService for DashboardAuthServiceImpl {
         Ok(())
     }
 
+    async fn refresh(&self, token: &str) -> Result<LoginResult, DashboardAuthServiceError> {
+        let raw = hex::decode(token).map_err(|_| DashboardAuthServiceError::InvalidCredentials)?;
+        let token_hash = auth::token::hash(&raw);
+        let now = Utc::now();
+
+        let mut txn = self.pool.begin().await?;
+
+        let refresh_token = employee_refresh_token_repository::find_by_hash(&mut *txn, &token_hash)
+            .await?
+            .ok_or(DashboardAuthServiceError::InvalidCredentials)?;
+
+        if refresh_token.revoked_at.is_some() {
+            return Err(DashboardAuthServiceError::InvalidCredentials);
+        }
+
+        if refresh_token.expires_at < now {
+            return Err(DashboardAuthServiceError::InvalidCredentials);
+        }
+
+        let employee = employee_repository::find_by_id(&mut *txn, refresh_token.employee_id)
+            .await?
+            .ok_or(DashboardAuthServiceError::InvalidCredentials)?;
+
+        if !employee.is_active {
+            return Err(DashboardAuthServiceError::AccountInactive);
+        }
+
+        employee_refresh_token_repository::revoke(&mut *txn, &token_hash, now).await?;
+
+        let (access_token, raw_refresh_token) = self
+            .generate_tokens(&mut txn, employee.id, &employee.role)
+            .await?;
+
+        txn.commit().await?;
+
+        Ok(LoginResult {
+            access_token,
+            refresh_token: raw_refresh_token,
+            expires_in: self.token_config.access_token_ttl,
+        })
+    }
+
     async fn verify_all(&self) -> Result<(), DashboardAuthServiceError> {
         let now = Utc::now();
         let mut txn = self.pool.begin().await?;
@@ -389,5 +431,178 @@ mod tests {
 
         let result = service.logout(&hex_token).await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn refresh_should_succeed_with_valid_token() {
+        let service = setup_service().await;
+        service
+            .register("owner@example.com", "password1234")
+            .await
+            .expect("registration should succeed");
+
+        service
+            .verify_all()
+            .await
+            .expect("verify_all should succeed");
+
+        let login_result = service
+            .login("owner@example.com", "password1234")
+            .await
+            .expect("login should succeed");
+
+        let hex_token = hex::encode(&login_result.refresh_token);
+        let result = service.refresh(&hex_token).await;
+        assert!(result.is_ok());
+
+        let refresh_result = result.unwrap();
+        assert!(!refresh_result.access_token.is_empty());
+        assert!(!refresh_result.refresh_token.is_empty());
+        assert_eq!(refresh_result.expires_in, 900);
+    }
+
+    #[tokio::test]
+    async fn refresh_should_fail_with_invalid_token() {
+        let service = setup_service().await;
+        let result = service.refresh("deadbeef").await;
+        assert!(matches!(
+            result.unwrap_err(),
+            DashboardAuthServiceError::InvalidCredentials
+        ));
+    }
+
+    #[tokio::test]
+    async fn refresh_should_fail_with_revoked_token() {
+        let service = setup_service().await;
+        service
+            .register("owner@example.com", "password1234")
+            .await
+            .expect("registration should succeed");
+
+        service
+            .verify_all()
+            .await
+            .expect("verify_all should succeed");
+
+        let login_result = service
+            .login("owner@example.com", "password1234")
+            .await
+            .expect("login should succeed");
+
+        let hex_token = hex::encode(&login_result.refresh_token);
+
+        service
+            .logout(&hex_token)
+            .await
+            .expect("logout should succeed");
+
+        let result = service.refresh(&hex_token).await;
+        assert!(matches!(
+            result.unwrap_err(),
+            DashboardAuthServiceError::InvalidCredentials
+        ));
+    }
+
+    #[tokio::test]
+    async fn refresh_should_fail_with_expired_token() {
+        let service = setup_service().await;
+        service
+            .register("owner@example.com", "password1234")
+            .await
+            .expect("registration should succeed");
+
+        service
+            .verify_all()
+            .await
+            .expect("verify_all should succeed");
+
+        let login_result = service
+            .login("owner@example.com", "password1234")
+            .await
+            .expect("login should succeed");
+
+        let raw = &login_result.refresh_token;
+        let token_hash = crate::auth::token::hash(raw);
+
+        let past = Utc::now() - chrono::Duration::hours(1);
+        sqlx::query("UPDATE employee_refresh_token SET expires_at = ? WHERE token_hash = ?")
+            .bind(past)
+            .bind(&token_hash)
+            .execute(&service.pool)
+            .await
+            .unwrap();
+
+        let hex_token = hex::encode(raw);
+        let result = service.refresh(&hex_token).await;
+        assert!(matches!(
+            result.unwrap_err(),
+            DashboardAuthServiceError::InvalidCredentials
+        ));
+    }
+
+    #[tokio::test]
+    async fn refresh_should_fail_when_account_inactive() {
+        let service = setup_service().await;
+        service
+            .register("owner@example.com", "password1234")
+            .await
+            .expect("registration should succeed");
+
+        service
+            .verify_all()
+            .await
+            .expect("verify_all should succeed");
+
+        let login_result = service
+            .login("owner@example.com", "password1234")
+            .await
+            .expect("login should succeed");
+
+        let mut txn = service.pool.begin().await.unwrap();
+        sqlx::query("UPDATE employee SET is_active = FALSE WHERE email = ?")
+            .bind("owner@example.com")
+            .execute(&mut *txn)
+            .await
+            .unwrap();
+        txn.commit().await.unwrap();
+
+        let hex_token = hex::encode(&login_result.refresh_token);
+        let result = service.refresh(&hex_token).await;
+        assert!(matches!(
+            result.unwrap_err(),
+            DashboardAuthServiceError::AccountInactive
+        ));
+    }
+
+    #[tokio::test]
+    async fn refresh_should_revoke_old_token() {
+        let service = setup_service().await;
+        service
+            .register("owner@example.com", "password1234")
+            .await
+            .expect("registration should succeed");
+
+        service
+            .verify_all()
+            .await
+            .expect("verify_all should succeed");
+
+        let login_result = service
+            .login("owner@example.com", "password1234")
+            .await
+            .expect("login should succeed");
+
+        let hex_token = hex::encode(&login_result.refresh_token);
+
+        service
+            .refresh(&hex_token)
+            .await
+            .expect("first refresh should succeed");
+
+        let result = service.refresh(&hex_token).await;
+        assert!(matches!(
+            result.unwrap_err(),
+            DashboardAuthServiceError::InvalidCredentials
+        ));
     }
 }
