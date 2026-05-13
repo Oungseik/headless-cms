@@ -66,12 +66,18 @@ impl From<crate::features::dashboard_auth::service::DashboardAuthServiceError> f
             E::WeakPassword => {
                 Self::BadRequest("Password must be at least 8 characters".to_string())
             }
+            E::InvalidCredentials => Self::Unauthorized,
+            E::AccountInactive | E::EmailNotVerified => Self::Forbidden,
             E::Database(e) => {
                 tracing::error!("database error: {e}");
                 Self::InternalServerError
             }
             E::PasswordHashing(e) => {
                 tracing::error!("password hashing failed: {e}");
+                Self::InternalServerError
+            }
+            E::Jwt(e) => {
+                tracing::error!("JWT error: {e}");
                 Self::InternalServerError
             }
         }

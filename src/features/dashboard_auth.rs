@@ -1,5 +1,6 @@
 //! Dashboard authentication endpoints (login, register, logout, token refresh).
 
+pub mod login;
 pub mod register;
 pub mod service;
 pub mod service_impl;
@@ -15,7 +16,9 @@ use crate::{app::AppState, config::AppEnv};
 
 /// Returns the dashboard auth router.
 pub fn router(app_env: &AppEnv) -> OpenApiRouter<Arc<AppState>> {
-    let router = OpenApiRouter::new().routes(routes!(register::handler));
+    let router = OpenApiRouter::new()
+        .routes(routes!(register::handler))
+        .routes(routes!(login::handler));
 
     if *app_env == AppEnv::Testing {
         router.routes(routes!(test_verify_all::handler))

@@ -2,17 +2,73 @@ use chrono::Utc;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-use super::service::{DashboardAuthService, DashboardAuthServiceError};
+use super::service::{DashboardAuthService, DashboardAuthServiceError, LoginResult};
 use crate::{
     auth,
-    repositories::{employee_email_verification_token_repository, employee_repository},
+    repositories::{
+        employee_email_verification_token_repository, employee_refresh_token_repository,
+        employee_repository,
+    },
 };
 
+/// Configuration for JWT and refresh token generation.
+#[derive(Clone, Debug)]
+pub struct TokenConfig {
+    /// Secret key used to sign JWTs.
+    pub jwt_secret: String,
+    /// Access token time-to-live in seconds.
+    pub access_token_ttl: u64,
+    /// Refresh token time-to-live in seconds.
+    pub refresh_token_ttl: u64,
+}
+
+/// Implementation of [`DashboardAuthService`] backed by ``SQLite``.
 #[derive(Clone, Debug)]
 pub struct DashboardAuthServiceImpl {
+    /// Database connection pool.
     pub pool: SqlitePool,
+    /// bcrypt cost factor for password hashing.
     pub bcrypt_cost: u32,
+    /// Email verification token TTL in seconds.
     pub email_verification_token_ttl: u64,
+    /// Token generation configuration.
+    pub token_config: TokenConfig,
+}
+
+impl DashboardAuthServiceImpl {
+    /// Generates an access token (JWT) and a refresh token for the given
+    /// employee, persisting the refresh token hash within the provided transaction.
+    async fn generate_tokens(
+        &self,
+        txn: &mut sqlx::SqliteConnection,
+        employee_id: Uuid,
+        role: &str,
+    ) -> Result<(String, Vec<u8>), DashboardAuthServiceError> {
+        let access_token = auth::jwt::encode(
+            employee_id,
+            role,
+            self.token_config.jwt_secret.as_bytes(),
+            self.token_config.access_token_ttl,
+        )?;
+
+        let (raw_refresh_token, refresh_token_hash) = auth::token::generate();
+        let now = Utc::now();
+        let ttl = i64::try_from(self.token_config.refresh_token_ttl).unwrap_or(i64::MAX);
+        let refresh_expires_at = now + chrono::Duration::seconds(ttl);
+        let refresh_token_id = Uuid::now_v7();
+
+        employee_refresh_token_repository::insert(
+            txn,
+            refresh_token_id,
+            employee_id,
+            &refresh_token_hash,
+            refresh_expires_at,
+            now,
+        )
+        .await?;
+
+        Ok((access_token, raw_refresh_token.to_vec()))
+    }
 }
 
 impl DashboardAuthService for DashboardAuthServiceImpl {
@@ -71,6 +127,45 @@ impl DashboardAuthService for DashboardAuthServiceImpl {
         Ok(())
     }
 
+    async fn login(
+        &self,
+        email: &str,
+        password: &str,
+    ) -> Result<LoginResult, DashboardAuthServiceError> {
+        let mut txn = self.pool.begin().await?;
+
+        let employee = employee_repository::find_by_email(&mut *txn, email)
+            .await?
+            .ok_or(DashboardAuthServiceError::InvalidCredentials)?;
+
+        if !employee.is_active {
+            return Err(DashboardAuthServiceError::AccountInactive);
+        }
+
+        if employee.email_verified_at.is_none() {
+            return Err(DashboardAuthServiceError::EmailNotVerified);
+        }
+
+        let password_valid = auth::password::verify(password, &employee.password_hash)
+            .map_err(DashboardAuthServiceError::PasswordHashing)?;
+
+        if !password_valid {
+            return Err(DashboardAuthServiceError::InvalidCredentials);
+        }
+
+        let (access_token, raw_refresh_token) = self
+            .generate_tokens(&mut txn, employee.id, &employee.role)
+            .await?;
+
+        txn.commit().await?;
+
+        Ok(LoginResult {
+            access_token,
+            refresh_token: raw_refresh_token,
+            expires_in: self.token_config.access_token_ttl,
+        })
+    }
+
     async fn verify_all(&self) -> Result<(), DashboardAuthServiceError> {
         let now = Utc::now();
         let mut txn = self.pool.begin().await?;
@@ -123,5 +218,106 @@ mod tests {
             result.unwrap_err(),
             DashboardAuthServiceError::OwnerAlreadyExists
         ));
+    }
+
+    #[tokio::test]
+    async fn login_should_fail_with_invalid_email() {
+        let service = setup_service().await;
+        let result = service
+            .login("nonexistent@example.com", "password1234")
+            .await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            DashboardAuthServiceError::InvalidCredentials
+        ));
+    }
+
+    #[tokio::test]
+    async fn login_should_fail_with_wrong_password() {
+        let service = setup_service().await;
+        service
+            .register("owner@example.com", "password1234")
+            .await
+            .expect("registration should succeed");
+
+        service
+            .verify_all()
+            .await
+            .expect("verify_all should succeed");
+
+        let result = service.login("owner@example.com", "wrongpassword").await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            DashboardAuthServiceError::InvalidCredentials
+        ));
+    }
+
+    #[tokio::test]
+    async fn login_should_fail_when_email_not_verified() {
+        let service = setup_service().await;
+        service
+            .register("owner@example.com", "password1234")
+            .await
+            .expect("registration should succeed");
+
+        let result = service.login("owner@example.com", "password1234").await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            DashboardAuthServiceError::EmailNotVerified
+        ));
+    }
+
+    #[tokio::test]
+    async fn login_should_fail_when_account_inactive() {
+        let service = setup_service().await;
+        service
+            .register("owner@example.com", "password1234")
+            .await
+            .expect("registration should succeed");
+
+        service
+            .verify_all()
+            .await
+            .expect("verify_all should succeed");
+
+        let mut txn = service.pool.begin().await.unwrap();
+        sqlx::query("UPDATE employee SET is_active = FALSE WHERE email = ?")
+            .bind("owner@example.com")
+            .execute(&mut *txn)
+            .await
+            .unwrap();
+        txn.commit().await.unwrap();
+
+        let result = service.login("owner@example.com", "password1234").await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            DashboardAuthServiceError::AccountInactive
+        ));
+    }
+
+    #[tokio::test]
+    async fn login_should_succeed_and_return_tokens() {
+        let service = setup_service().await;
+        service
+            .register("owner@example.com", "password1234")
+            .await
+            .expect("registration should succeed");
+
+        service
+            .verify_all()
+            .await
+            .expect("verify_all should succeed");
+
+        let result = service.login("owner@example.com", "password1234").await;
+        assert!(result.is_ok());
+
+        let login_result = result.unwrap();
+        assert!(!login_result.access_token.is_empty());
+        assert!(!login_result.refresh_token.is_empty());
+        assert_eq!(login_result.expires_in, 900);
     }
 }

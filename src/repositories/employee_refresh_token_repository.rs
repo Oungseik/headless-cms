@@ -9,7 +9,6 @@ use crate::models::employee_refresh_token::EmployeeRefreshToken;
 /// # Errors
 ///
 /// Returns [`sqlx::Error`] if the insert fails.
-#[expect(dead_code, reason = "will be used by login handler")]
 pub async fn insert<'e, E: sqlx::Executor<'e, Database = Sqlite>>(
     executor: E,
     id: Uuid,

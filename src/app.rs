@@ -24,7 +24,7 @@ use crate::{
     app::error::{AppError, AppResult},
     config::get_config,
     features,
-    features::dashboard_auth::service_impl::DashboardAuthServiceImpl,
+    features::dashboard_auth::service_impl::{DashboardAuthServiceImpl, TokenConfig},
 };
 
 /// `OpenAPI` documentation specification.
@@ -102,6 +102,11 @@ pub async fn create_app() -> AppResult<Router> {
         pool,
         bcrypt_cost: config.bcrypt_cost,
         email_verification_token_ttl: config.email_verification_token_ttl,
+        token_config: TokenConfig {
+            jwt_secret: config.jwt_secret.clone(),
+            access_token_ttl: config.access_token_ttl,
+            refresh_token_ttl: config.refresh_token_ttl,
+        },
     };
 
     let state = Arc::new(AppState {
