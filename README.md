@@ -11,16 +11,9 @@ A headless POS + CMS backend built with Axum, sqlx, and preconfigured OpenAPI, O
 - [**tower_governor**](https://github.com/benwis/tower_governor) -- rate limiting
 - **jsonwebtoken** + **bcrypt** -- JWT auth and password hashing
 
-## API Endpoints
+## API
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/health/` | Health check |
-| `POST` | `/api/v1/dashboard/auth/register` | Register first owner account |
-| `POST` | `/api/v1/dashboard/auth/login` | Login, returns JWT + refresh token |
-| `POST` | `/api/v1/dashboard/auth/test/verify-all` | Test-only: verify all emails (when `APP_ENV=testing`) |
-
-Swagger UI at `/api-docs/swagger-ui`.
+Interactive docs via Swagger UI at `/api-docs/swagger-ui`.
 
 ## Getting Started
 
