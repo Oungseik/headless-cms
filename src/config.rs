@@ -38,6 +38,22 @@ pub struct Config {
     pub rate_limit_per_second: u64,
     #[clap(long, env, default_value_t = 10)]
     pub rate_limit_burst: u32,
+    #[clap(long, env, default_value = "Headless CMS")]
+    pub app_name: String,
+    #[clap(long, env, default_value = "")]
+    pub smtp_host: String,
+    #[clap(long, env, default_value_t = 587)]
+    pub smtp_port: u16,
+    #[clap(long, env, default_value = "")]
+    pub smtp_username: String,
+    #[clap(long, env, default_value = "")]
+    pub smtp_password: String,
+    #[clap(long, env, default_value = "noreply@localhost")]
+    pub smtp_from: String,
+    #[clap(long, env, default_value = "Headless CMS")]
+    pub smtp_from_name: String,
+    #[clap(long, env, default_value_t = true)]
+    pub smtp_starttls: bool,
 }
 
 impl std::fmt::Debug for Config {
@@ -59,6 +75,14 @@ impl std::fmt::Debug for Config {
             .field("rate_limit_enabled", &self.rate_limit_enabled)
             .field("rate_limit_per_second", &self.rate_limit_per_second)
             .field("rate_limit_burst", &self.rate_limit_burst)
+            .field("app_name", &self.app_name)
+            .field("smtp_host", &self.smtp_host)
+            .field("smtp_port", &self.smtp_port)
+            .field("smtp_username", &self.smtp_username)
+            .field("smtp_password", &"[REDACTED]")
+            .field("smtp_from", &self.smtp_from)
+            .field("smtp_from_name", &self.smtp_from_name)
+            .field("smtp_starttls", &self.smtp_starttls)
             .finish()
     }
 }

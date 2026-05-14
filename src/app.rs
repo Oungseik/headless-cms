@@ -23,7 +23,7 @@ use utoipa_swagger_ui::SwaggerUi;
 use crate::{
     app::error::{AppError, AppResult},
     config::get_config,
-    features,
+    email, features,
     features::dashboard_auth::service_impl::{DashboardAuthServiceImpl, TokenConfig},
 };
 
@@ -47,7 +47,7 @@ impl Modify for SecurityAddon {
 }
 
 /// Shared application state passed to all route handlers.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct AppState {
     pub dashboard_auth_service: DashboardAuthServiceImpl,
 }
@@ -98,6 +98,8 @@ pub async fn create_app() -> AppResult<Router> {
         None
     };
 
+    let email_sender = email::build_email_sender(config);
+
     let dashboard_auth_service = DashboardAuthServiceImpl {
         pool,
         bcrypt_cost: config.bcrypt_cost,
@@ -107,6 +109,9 @@ pub async fn create_app() -> AppResult<Router> {
             access_token_ttl: config.access_token_ttl,
             refresh_token_ttl: config.refresh_token_ttl,
         },
+        email_sender,
+        app_name: config.app_name.clone(),
+        base_url: config.base_url.clone(),
     };
 
     let state = Arc::new(AppState {

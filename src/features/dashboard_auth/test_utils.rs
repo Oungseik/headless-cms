@@ -1,4 +1,7 @@
+use std::sync::Arc;
+
 use super::service_impl::{DashboardAuthServiceImpl, TokenConfig};
+use crate::email::NoopEmailSender;
 
 pub async fn setup_service() -> DashboardAuthServiceImpl {
     let pool = sqlx::SqlitePool::connect("sqlite::memory:")
@@ -17,5 +20,8 @@ pub async fn setup_service() -> DashboardAuthServiceImpl {
             access_token_ttl: 900,
             refresh_token_ttl: 604_800,
         },
+        email_sender: Arc::new(NoopEmailSender),
+        app_name: "Test App".to_string(),
+        base_url: "http://localhost:3000".to_string(),
     }
 }

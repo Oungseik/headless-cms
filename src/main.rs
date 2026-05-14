@@ -3,6 +3,7 @@ use std::{error::Error, net::SocketAddr, sync::Arc};
 mod app;
 mod auth;
 mod config;
+mod email;
 mod features;
 mod models;
 mod repositories;

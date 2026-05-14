@@ -39,6 +39,7 @@ unsafe_code = "forbid"
 
 [dependencies]
 axum = { version = "0.8.9" }
+async-trait = "0.1"
 axum-tracing-opentelemetry = "0.33.1"
 bcrypt = "0.17"
 chrono = { workspace = true }
@@ -46,6 +47,7 @@ clap = { workspace = true }
 dotenvy = { workspace = true }
 hex = "0.4"
 jsonwebtoken = "9"
+lettre = { version = "0.11", features = ["tokio1-native-tls"] }
 opentelemetry = "0.31.0"
 opentelemetry-otlp = { version = "0.31.1", features = [
   "http-proto",

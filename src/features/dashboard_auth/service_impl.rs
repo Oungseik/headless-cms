@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use chrono::Utc;
 use sqlx::SqlitePool;
 use uuid::Uuid;
@@ -5,6 +7,7 @@ use uuid::Uuid;
 use super::service::{DashboardAuthService, DashboardAuthServiceError, LoginResult};
 use crate::{
     auth,
+    email::EmailSender,
     repositories::{
         employee_email_verification_token_repository, employee_refresh_token_repository,
         employee_repository,
@@ -23,7 +26,6 @@ pub struct TokenConfig {
 }
 
 /// Implementation of [`DashboardAuthService`] backed by ``SQLite``.
-#[derive(Clone, Debug)]
 pub struct DashboardAuthServiceImpl {
     /// Database connection pool.
     pub pool: SqlitePool,
@@ -33,6 +35,29 @@ pub struct DashboardAuthServiceImpl {
     pub email_verification_token_ttl: u64,
     /// Token generation configuration.
     pub token_config: TokenConfig,
+    /// Email sender for verification emails.
+    pub email_sender: Arc<dyn EmailSender>,
+    /// Application name for email subjects.
+    pub app_name: String,
+    /// Base URL for verification links.
+    pub base_url: String,
+}
+
+impl std::fmt::Debug for DashboardAuthServiceImpl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DashboardAuthServiceImpl")
+            .field("pool", &self.pool)
+            .field("bcrypt_cost", &self.bcrypt_cost)
+            .field(
+                "email_verification_token_ttl",
+                &self.email_verification_token_ttl,
+            )
+            .field("token_config", &self.token_config)
+            .field("email_sender", &"<dyn EmailSender>")
+            .field("app_name", &self.app_name)
+            .field("base_url", &self.base_url)
+            .finish()
+    }
 }
 
 impl DashboardAuthServiceImpl {
@@ -108,7 +133,7 @@ impl DashboardAuthService for DashboardAuthServiceImpl {
         .await?;
 
         let token_id = Uuid::now_v7();
-        let (_, token_hash) = auth::token::generate();
+        let (raw_token, token_hash) = auth::token::generate();
         let ttl = i64::try_from(self.email_verification_token_ttl).unwrap_or(i64::MAX);
         let expires_at = now + chrono::Duration::seconds(ttl);
 
@@ -123,6 +148,18 @@ impl DashboardAuthService for DashboardAuthServiceImpl {
         .await?;
 
         txn.commit().await?;
+
+        let token_hex = hex::encode(raw_token);
+        let (subject, text_body, html_body) =
+            crate::email::build_verification_email(&self.app_name, &self.base_url, &token_hex);
+
+        if let Err(e) = self
+            .email_sender
+            .send(email, &subject, &text_body, &html_body)
+            .await
+        {
+            tracing::error!("failed to send verification email to {email}: {e}");
+        }
 
         Ok(())
     }
