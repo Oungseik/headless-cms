@@ -4,6 +4,7 @@ pub mod login;
 pub mod logout;
 pub mod refresh;
 pub mod register;
+pub mod resend_verification_email;
 pub mod service;
 pub mod service_impl;
 #[cfg(test)]
@@ -24,7 +25,8 @@ pub fn router(app_env: &AppEnv) -> OpenApiRouter<Arc<AppState>> {
         .routes(routes!(login::handler))
         .routes(routes!(logout::handler))
         .routes(routes!(refresh::handler))
-        .routes(routes!(verify_email::handler));
+        .routes(routes!(verify_email::handler))
+        .routes(routes!(resend_verification_email::handler));
 
     if *app_env == AppEnv::Testing {
         router.routes(routes!(test_verify_all::handler))

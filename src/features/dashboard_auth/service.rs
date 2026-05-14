@@ -82,4 +82,15 @@ pub trait DashboardAuthService: Send + Sync + 'static {
     /// if the email was already verified, or [`DashboardAuthServiceError::AccountNotFound`]
     /// if the employee no longer exists.
     async fn verify_email(&self, token: &str) -> Result<(), DashboardAuthServiceError>;
+
+    /// Generates a new verification email token, deleting any existing ones.
+    ///
+    /// Returns `token_hex` so the caller can send the email asynchronously.
+    /// Fails with [`DashboardAuthServiceError::AccountNotFound`]
+    /// if the email is not registered, or [`DashboardAuthServiceError::EmailAlreadyVerified`]
+    /// if the email is already verified.
+    async fn resend_verification_email(
+        &self,
+        email: &str,
+    ) -> Result<String, DashboardAuthServiceError>;
 }

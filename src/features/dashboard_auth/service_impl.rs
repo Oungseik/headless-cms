@@ -310,6 +310,46 @@ impl DashboardAuthService for DashboardAuthServiceImpl {
 
         Ok(())
     }
+
+    async fn resend_verification_email(
+        &self,
+        email: &str,
+    ) -> Result<String, DashboardAuthServiceError> {
+        let mut txn = self.pool.begin().await?;
+
+        let employee = employee_repository::find_by_email(&mut *txn, email)
+            .await?
+            .ok_or(DashboardAuthServiceError::AccountNotFound)?;
+
+        if employee.email_verified_at.is_some() {
+            return Err(DashboardAuthServiceError::EmailAlreadyVerified);
+        }
+
+        employee_email_verification_token_repository::delete_by_employee_id(&mut *txn, employee.id)
+            .await?;
+
+        let token_id = Uuid::now_v7();
+        let (raw_token, token_hash) = auth::token::generate();
+        let now = Utc::now();
+        let ttl = i64::try_from(self.email_verification_token_ttl).unwrap_or(i64::MAX);
+        let expires_at = now + chrono::Duration::seconds(ttl);
+
+        employee_email_verification_token_repository::insert(
+            &mut *txn,
+            token_id,
+            employee.id,
+            &token_hash,
+            expires_at,
+            now,
+        )
+        .await?;
+
+        txn.commit().await?;
+
+        let token_hex = hex::encode(raw_token);
+
+        Ok(token_hex)
+    }
 }
 
 #[cfg(test)]
@@ -836,5 +876,58 @@ mod tests {
             result.unwrap_err(),
             DashboardAuthServiceError::EmailAlreadyVerified
         ));
+    }
+
+    #[tokio::test]
+    async fn resend_verification_email_should_fail_when_email_not_found() {
+        let service = setup_service().await;
+        let result = service
+            .resend_verification_email("nonexistent@example.com")
+            .await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            DashboardAuthServiceError::AccountNotFound
+        ));
+    }
+
+    #[tokio::test]
+    async fn resend_verification_email_should_fail_when_already_verified() {
+        let service = setup_service().await;
+        let (hex_token, _) = register_with_known_token(&service).await;
+
+        service
+            .verify_email(&hex_token)
+            .await
+            .expect("verify should succeed");
+
+        let result = service.resend_verification_email("owner@example.com").await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            DashboardAuthServiceError::EmailAlreadyVerified
+        ));
+    }
+
+    #[tokio::test]
+    async fn resend_verification_email_should_succeed_and_delete_old_tokens() {
+        let service = setup_service().await;
+        let (_, employee_id) = register_with_known_token(&service).await;
+
+        let result = service.resend_verification_email("owner@example.com").await;
+        assert!(result.is_ok());
+
+        let token_hex = result.unwrap();
+        assert!(!token_hex.is_empty());
+
+        // Verify old tokens deleted and new one exists
+        let tokens_count: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM employee_email_verification_token WHERE employee_id = ?",
+        )
+        .bind(employee_id)
+        .fetch_one(&service.pool)
+        .await
+        .unwrap();
+        assert_eq!(tokens_count.0, 1);
     }
 }
