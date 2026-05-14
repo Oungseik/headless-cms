@@ -24,7 +24,7 @@ pub struct ResendVerificationEmailResponse {
 
 #[utoipa::path(
     post,
-    path = "/verify-email/resend",
+    path = "/email/verification/resend",
     operation_id = "dashboard_auth_resend_verification_email",
     request_body = ResendVerificationEmailRequest,
     responses(

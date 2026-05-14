@@ -41,7 +41,7 @@ pub fn build_verification_email(
 ) -> (String, String, String) {
     let base_url = base_url.trim_end_matches('/');
     let verification_url =
-        format!("{base_url}/api/v1/dashboard/auth/verify-email?token={token_hex}");
+        format!("{base_url}/api/v1/dashboard/auth/email/verification?token={token_hex}");
     let subject = format!("Verify your email — {app_name}");
 
     let text_template = include_str!("email/templates/verify_email.txt");

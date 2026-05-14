@@ -29,7 +29,7 @@ pub struct VerifyEmailResponse {
 
 #[utoipa::path(
     get,
-    path = "/verify-email",
+    path = "/email/verification",
     operation_id = "dashboard_auth_verify_email",
     params(
         ("token" = String, Query, description = "Raw verification token"),
