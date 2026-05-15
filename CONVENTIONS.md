@@ -17,7 +17,7 @@ config → app → features → services → entities
 | **Entities** | SeaORM generated models | `entity/` crate |
 | **Migrations** | Database schema versions | `migration/` crate |
 
-AppState holds `Arc<dyn <Domain>Service>` for each domain, enabling test-time substitution via mocks.
+AppState holds concrete generic types like `<Domain>ServiceImpl<DependencyImpl>` for each domain. Dependencies are resolved at compile time — no dynamic dispatch, no `Arc<dyn>`.
 
 ## Money Handling Convention
 
@@ -64,17 +64,18 @@ Response types use `#[serde(rename_all = "camelCase")]` for JSON serialization.
 
 When a service needs another service (e.g., `OrderService` needs `ProductService`):
 
-- Services receive `Arc<dyn SiblingService>` in their constructor, NOT the entire `AppState`
-- This prevents circular dependencies and keeps testability clean
-- Example: `OrderServiceImpl { db, product_service: Arc<dyn ProductService>, tax_service: Arc<dyn TaxService> }`
+- Services are generic over their dependencies: `OrderServiceImpl<T: ProductService>`
+- `AppState` stores concrete types: `OrderServiceImpl<ProductServiceImpl>`
+- Tests substitute mock dependencies: `OrderServiceImpl<MockProductService>`
+- Example: `pub struct OrderServiceImpl<T: ProductService, U: TaxService> { product_service: Arc<T>, tax_service: Arc<U> }`
 
 ## Feature Directory Structure
 
 ```
 src/features/<domain>/
   <domain>.rs       — pub fn router() -> OpenApiRouter<Arc<AppState>>
-  service.rs        — #[async_trait] trait definition
-  service_impl.rs   — production implementation (wraps DatabaseConnection)
+  service.rs        — trait definition (native async fn)
+  service_impl.rs   — production implementation (generic over dependencies)
   service_mock.rs   — #[cfg(test)] mock with interior mutability
   <operation>.rs    — one file per handler (e.g. get_by_id.rs, create.rs)
 ```
@@ -92,15 +93,12 @@ Use SeaORM CLI to generate from the database, or hand-write in the `entity/` and
 File: `src/features/<domain>/service.rs`
 
 ```rust
-use async_trait::async_trait;
-
 #[derive(Debug)]
 pub enum PostServiceError {
     NotFound(i32),
     Database(sea_orm::DbErr),
 }
 
-#[async_trait]
 pub trait PostService: Send + Sync + 'static {
     async fn get_by_id(
         &self,
@@ -109,24 +107,22 @@ pub trait PostService: Send + Sync + 'static {
 }
 ```
 
-Convention: `Send + Sync + 'static` bounds are required so the trait can be wrapped in `Arc<dyn>` and shared across threads.
+Convention: `Send + Sync + 'static` bounds are required so the trait can be used with `Arc<T>` and shared across threads. No `#[async_trait]` needed — Rust 2024 supports `async fn` in traits natively.
 
 ### 3. Create the production implementation
 
 File: `src/features/<domain>/service_impl.rs`
 
 ```rust
-use async_trait::async_trait;
 use sea_orm::{DatabaseConnection, EntityTrait};
 
 use super::service::{PostService, PostServiceError};
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct PostServiceImpl {
     pub db: DatabaseConnection,
 }
 
-#[async_trait]
 impl PostService for PostServiceImpl {
     async fn get_by_id(
         &self,
@@ -142,22 +138,22 @@ impl PostService for PostServiceImpl {
 
 ### 4. Add field to AppState
 
-File: `src/app.rs` — add to the struct and Debug impl:
+File: `src/app.rs` — add to the struct:
 
 ```rust
-#[derive(Clone)]
+#[derive(Debug)]
 pub struct AppState {
-    pub user_service: Arc<dyn UserService>,
-    pub post_service: Arc<dyn PostService>,  // new
+    pub user_service: UserServiceImpl,
+    pub post_service: PostServiceImpl,  // new
 }
 ```
 
-> **Note:** `DatabaseConnection` is NOT a field on `AppState`. It lives only inside each `*ServiceImpl`, which is constructed in `create_app()` and then erased behind `Arc<dyn <Domain>Service>`.
+> **Note:** `DatabaseConnection` is NOT a field on `AppState`. It lives only inside each `*ServiceImpl`, which is constructed in `create_app()`.
 
 Add the import at the top:
 
 ```rust
-use crate::features::posts::service::PostService;
+use crate::features::posts::service_impl::PostServiceImpl;
 ```
 
 ### 5. Wire in create_app()
@@ -165,8 +161,7 @@ use crate::features::posts::service::PostService;
 File: `src/app.rs` — construct the impl and pass to state:
 
 ```rust
-let post_service: Arc<dyn PostService> =
-    Arc::new(crate::features::posts::service_impl::PostServiceImpl { db: db.clone() });
+let post_service = PostServiceImpl { db: db.clone() };
 let state = Arc::new(AppState { user_service, post_service });
 ```
 
@@ -272,7 +267,6 @@ File: `src/features/<domain>/service_mock.rs`
 ```rust
 #[cfg(test)]
 pub mod tests {
-    use async_trait::async_trait;
     use std::collections::HashMap;
     use std::sync::Mutex;
 
@@ -289,7 +283,6 @@ pub mod tests {
         }
     }
 
-    #[async_trait]
     impl PostService for MockPostService {
         async fn get_by_id(
             &self,
@@ -340,28 +333,28 @@ Tests live inline at the bottom of each handler file:
 ```rust
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
     use axum::extract::{Path, State};
+    use std::sync::Arc;
     use crate::app::AppState;
-    use crate::features::users::service_mock::tests::MockUserService;
+    use crate::features::users::service_impl::UserServiceImpl;
+    use crate::features::users::service_mock::tests::MockEmailSender;
     use crate::features::users::service::UserService;
 
     #[tokio::test]
     async fn test_get_user_by_id_found() {
-        // 1. Build mock and seed data
-        let mock = MockUserService::new();
-        mock.users.lock().unwrap().insert(1, entity::user::Model { /* ... */ });
+        // 1. Build impl with mock dependencies
+        let service = UserServiceImpl {
+            db: test_db(),
+            email_sender: MockEmailSender::new(),
+        };
 
-        // 2. Wrap in Arc<dyn Trait>
-        let mock: Arc<dyn UserService> = Arc::new(mock);
+        // 2. Create AppState with concrete impl
+        let state = Arc::new(AppState { user_service: service });
 
-        // 3. Create AppState with mock
-        let state = Arc::new(AppState { user_service: mock });
-
-        // 4. Call handler directly
+        // 3. Call handler directly
         let result = super::handler(State(state), Path(1)).await;
 
-        // 5. Assert
+        // 4. Assert
         assert!(result.is_ok());
     }
 }
@@ -369,8 +362,8 @@ mod tests {
 
 Key points:
 
-- Use `MockUserService` for unit tests — no real database needed
-- `AppState` has no `db` field; `DatabaseConnection` lives only inside `*ServiceImpl`
+- `AppState` holds concrete types, not `Arc<dyn Trait>`
+- Dependencies are generic: `UserServiceImpl<T: EmailSender>` — tests pass mocks, production passes real impls
 - Call handlers as plain async functions: `super::handler(State(state), Path(id)).await`
 - The mock uses `Mutex<HashMap<K, V>>` for interior mutability without `mut`
 - For integration tests that need real DB behavior, test `service_impl` directly against a test database
@@ -385,9 +378,9 @@ When adding a new domain, verify every item:
 - [ ] Entity created in `entity/` crate
 - [ ] Migration created in `migration/` crate
 - [ ] Service trait defined in `service.rs`
-- [ ] Service impl created in `service_impl.rs`
-- [ ] `Arc<dyn <Domain>Service>` field added to `AppState`
-- [ ] Field included in `Debug` impl for `AppState`
+- [ ] Service impl created in `service_impl.rs` (generic over dependencies)
+- [ ] `<Domain>ServiceImpl<DependencyImpl>` field added to `AppState`
+- [ ] `#[derive(Debug)]` on `AppState` (derive works when all fields impl Debug)
 - [ ] Import added to `src/app.rs`
 - [ ] Service constructed in `create_app()`
 - [ ] Handler files created with `#[utoipa::path]` annotations
@@ -402,7 +395,7 @@ When adding a new domain, verify every item:
 |---------|------|
 | App wiring & AppState | `src/app.rs` |
 | Error types | `src/app/error.rs` |
-| Full domain example | `src/features/users/` |
+| Full domain example | `src/features/dashboard_auth/` |
 | Simple domain (no service) | `src/features/health.rs` |
 | Config | `src/config.rs` |
 | Entry point | `src/main.rs` |

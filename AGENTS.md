@@ -8,6 +8,7 @@
 ## Testing
 
 ### Unit Tests (Rust)
+- **only write unit tests when the logic is complex enough** . For example parsing `Bear` token from header is less than 10 lines of code and simple to understand so no need test for that.
 - Write unit tests in Rust using `#[cfg(test)]` modules within the same file as the code being tested
 - Use `#[tokio::test]` for async tests
 - Place tests at the bottom of the file after the implementation code
