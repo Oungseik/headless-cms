@@ -38,6 +38,10 @@ pub struct Config {
     pub rate_limit_per_second: u64,
     #[clap(long, env, default_value_t = 10)]
     pub rate_limit_burst: u32,
+    #[clap(long, env, default_value_t = 60)]
+    pub login_rate_limit_per_second: u64,
+    #[clap(long, env, default_value_t = 3)]
+    pub login_rate_limit_burst: u32,
     #[clap(long, env, default_value = "Headless CMS")]
     pub app_name: String,
     #[clap(long, env, default_value = "")]
@@ -75,6 +79,11 @@ impl std::fmt::Debug for Config {
             .field("rate_limit_enabled", &self.rate_limit_enabled)
             .field("rate_limit_per_second", &self.rate_limit_per_second)
             .field("rate_limit_burst", &self.rate_limit_burst)
+            .field(
+                "login_rate_limit_per_second",
+                &self.login_rate_limit_per_second,
+            )
+            .field("login_rate_limit_burst", &self.login_rate_limit_burst)
             .field("app_name", &self.app_name)
             .field("smtp_host", &self.smtp_host)
             .field("smtp_port", &self.smtp_port)

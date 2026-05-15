@@ -81,7 +81,11 @@ impl<T: EmailSender> DashboardAuthServiceImpl<T> {
 }
 
 impl<T: EmailSender> DashboardAuthService for DashboardAuthServiceImpl<T> {
-    async fn register(&self, email: &str, password: &str) -> Result<(), DashboardAuthServiceError> {
+    async fn register(
+        &self,
+        email: &str,
+        password: &str,
+    ) -> Result<String, DashboardAuthServiceError> {
         if password.len() < 8 {
             return Err(DashboardAuthServiceError::WeakPassword);
         }
@@ -134,18 +138,8 @@ impl<T: EmailSender> DashboardAuthService for DashboardAuthServiceImpl<T> {
         txn.commit().await?;
 
         let token_hex = hex::encode(raw_token);
-        let (subject, text_body, html_body) =
-            crate::email::build_verification_email(&self.app_name, &self.base_url, &token_hex);
 
-        if let Err(e) = self
-            .email_sender
-            .send(email, &subject, &text_body, &html_body)
-            .await
-        {
-            tracing::error!("failed to send verification email to {email}: {e}");
-        }
-
-        Ok(())
+        Ok(token_hex)
     }
 
     async fn login(
@@ -188,7 +182,9 @@ impl<T: EmailSender> DashboardAuthService for DashboardAuthServiceImpl<T> {
     }
 
     async fn logout(&self, token: &str) -> Result<(), DashboardAuthServiceError> {
-        let raw = hex::decode(token).map_err(|_| DashboardAuthServiceError::InvalidCredentials)?;
+        let Ok(raw) = hex::decode(token) else {
+            return Ok(());
+        };
         let token_hash = auth::token::hash(&raw);
         let now = Utc::now();
         employee_refresh_token_repository::revoke(&self.pool, &token_hash, now).await?;
@@ -503,13 +499,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn logout_should_succeed_with_invalid_token() {
+    async fn logout_should_succeed_with_invalid_hex_token() {
         let service = setup_service().await;
         let result = service.logout("not-a-valid-hex").await;
-        assert!(matches!(
-            result.unwrap_err(),
-            DashboardAuthServiceError::InvalidCredentials
-        ));
+        assert!(result.is_ok());
     }
 
     #[tokio::test]

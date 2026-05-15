@@ -9,6 +9,7 @@ use crate::{
         AppState,
         error::{AppResult, ErrorResponse},
     },
+    email::EmailSender,
     features::dashboard_auth::service::DashboardAuthService,
 };
 
@@ -49,10 +50,27 @@ pub async fn handler(
     State(state): State<Arc<AppState>>,
     Json(body): Json<RegisterRequest>,
 ) -> AppResult<(StatusCode, Json<RegisterResponse>)> {
-    state
+    let token_hex = state
         .dashboard_auth_service
         .register(&body.email, &body.password)
         .await?;
+
+    let app_name = state.dashboard_auth_service.app_name.clone();
+    let base_url = state.dashboard_auth_service.base_url.clone();
+    let email_sender = state.dashboard_auth_service.email_sender.clone();
+    let email = body.email;
+
+    tokio::spawn(async move {
+        let (subject, text_body, html_body) =
+            crate::email::build_verification_email(&app_name, &base_url, &token_hex);
+
+        if let Err(e) = email_sender
+            .send(&email, &subject, &text_body, &html_body)
+            .await
+        {
+            tracing::error!("failed to send verification email to {email}: {e}");
+        }
+    });
 
     Ok((
         StatusCode::CREATED,

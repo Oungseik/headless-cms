@@ -39,10 +39,17 @@ pub struct LoginResult {
 pub trait DashboardAuthService: Send + Sync + 'static {
     /// Registers the first owner account.
     ///
+    /// Returns `token_hex` so the caller can send the verification email
+    /// asynchronously.
+    ///
     /// Fails with [`DashboardAuthServiceError::OwnerAlreadyExists`] if an owner
     /// already exists, or [`DashboardAuthServiceError::WeakPassword`] if the
     /// password is shorter than 8 characters.
-    async fn register(&self, email: &str, password: &str) -> Result<(), DashboardAuthServiceError>;
+    async fn register(
+        &self,
+        email: &str,
+        password: &str,
+    ) -> Result<String, DashboardAuthServiceError>;
 
     /// Authenticates an employee and returns access + refresh tokens.
     ///
