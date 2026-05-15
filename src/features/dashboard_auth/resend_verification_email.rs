@@ -9,6 +9,7 @@ use crate::{
         AppState,
         error::{AppResult, ErrorResponse},
     },
+    email::EmailSender,
     features::dashboard_auth::service::DashboardAuthService,
 };
 

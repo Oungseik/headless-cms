@@ -1,11 +1,8 @@
-use async_trait::async_trait;
-
 use super::sender::{EmailError, EmailSender};
 
 #[derive(Debug)]
 pub struct NoopEmailSender;
 
-#[async_trait]
 impl EmailSender for NoopEmailSender {
     async fn send(
         &self,

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use super::service_impl::{DashboardAuthServiceImpl, TokenConfig};
 use crate::email::NoopEmailSender;
 
-pub async fn setup_service() -> DashboardAuthServiceImpl {
+pub async fn setup_service() -> DashboardAuthServiceImpl<NoopEmailSender> {
     let pool = sqlx::SqlitePool::connect("sqlite::memory:")
         .await
         .expect("failed to connect to in-memory sqlite");

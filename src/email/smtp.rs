@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use lettre::{
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
     transport::smtp::authentication::Credentials,
@@ -54,7 +53,6 @@ impl SmtpEmailSender {
     }
 }
 
-#[async_trait]
 impl EmailSender for SmtpEmailSender {
     async fn send(
         &self,

@@ -23,7 +23,8 @@ use utoipa_swagger_ui::SwaggerUi;
 use crate::{
     app::error::{AppError, AppResult},
     config::get_config,
-    email, features,
+    email::SmtpEmailSender,
+    features,
     features::dashboard_auth::service_impl::{DashboardAuthServiceImpl, TokenConfig},
 };
 
@@ -49,7 +50,7 @@ impl Modify for SecurityAddon {
 /// Shared application state passed to all route handlers.
 #[derive(Debug)]
 pub struct AppState {
-    pub dashboard_auth_service: DashboardAuthServiceImpl,
+    pub dashboard_auth_service: DashboardAuthServiceImpl<SmtpEmailSender>,
 }
 
 /// Builds the complete Axum [`Router`] with all routes, middleware, and CORS.
@@ -98,7 +99,21 @@ pub async fn create_app() -> AppResult<Router> {
         None
     };
 
-    let email_sender = email::build_email_sender(config);
+    let email_sender = Arc::new(
+        SmtpEmailSender::new(
+            &config.smtp_host,
+            config.smtp_port,
+            &config.smtp_username,
+            &config.smtp_password,
+            &config.smtp_from_name,
+            &config.smtp_from,
+            config.smtp_starttls,
+        )
+        .map_err(|e| {
+            tracing::error!("failed to create SMTP sender: {e}");
+            AppError::InternalServerError
+        })?,
+    );
 
     let dashboard_auth_service = DashboardAuthServiceImpl {
         pool,

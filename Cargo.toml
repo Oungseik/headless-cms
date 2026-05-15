@@ -39,7 +39,6 @@ unsafe_code = "forbid"
 
 [dependencies]
 axum = { version = "0.8.9" }
-async-trait = "0.1"
 axum-tracing-opentelemetry = "0.33.1"
 bcrypt = "0.17"
 chrono = { workspace = true }

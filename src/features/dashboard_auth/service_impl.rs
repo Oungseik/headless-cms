@@ -26,7 +26,8 @@ pub struct TokenConfig {
 }
 
 /// Implementation of [`DashboardAuthService`] backed by ``SQLite``.
-pub struct DashboardAuthServiceImpl {
+#[derive(Debug)]
+pub struct DashboardAuthServiceImpl<T: EmailSender> {
     /// Database connection pool.
     pub pool: SqlitePool,
     /// bcrypt cost factor for password hashing.
@@ -36,31 +37,14 @@ pub struct DashboardAuthServiceImpl {
     /// Token generation configuration.
     pub token_config: TokenConfig,
     /// Email sender for verification emails.
-    pub email_sender: Arc<dyn EmailSender>,
+    pub email_sender: Arc<T>,
     /// Application name for email subjects.
     pub app_name: String,
     /// Base URL for verification links.
     pub base_url: String,
 }
 
-impl std::fmt::Debug for DashboardAuthServiceImpl {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DashboardAuthServiceImpl")
-            .field("pool", &self.pool)
-            .field("bcrypt_cost", &self.bcrypt_cost)
-            .field(
-                "email_verification_token_ttl",
-                &self.email_verification_token_ttl,
-            )
-            .field("token_config", &self.token_config)
-            .field("email_sender", &"<dyn EmailSender>")
-            .field("app_name", &self.app_name)
-            .field("base_url", &self.base_url)
-            .finish()
-    }
-}
-
-impl DashboardAuthServiceImpl {
+impl<T: EmailSender> DashboardAuthServiceImpl<T> {
     /// Generates an access token (JWT) and a refresh token for the given
     /// employee, persisting the refresh token hash within the provided transaction.
     async fn generate_tokens(
@@ -96,7 +80,7 @@ impl DashboardAuthServiceImpl {
     }
 }
 
-impl DashboardAuthService for DashboardAuthServiceImpl {
+impl<T: EmailSender> DashboardAuthService for DashboardAuthServiceImpl<T> {
     async fn register(&self, email: &str, password: &str) -> Result<(), DashboardAuthServiceError> {
         if password.len() < 8 {
             return Err(DashboardAuthServiceError::WeakPassword);
@@ -355,8 +339,9 @@ impl DashboardAuthService for DashboardAuthServiceImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::features::dashboard_auth::{
-        service::DashboardAuthServiceError, test_utils::setup_service,
+    use crate::{
+        email::NoopEmailSender,
+        features::dashboard_auth::{service::DashboardAuthServiceError, test_utils::setup_service},
     };
 
     #[tokio::test]
@@ -731,7 +716,9 @@ mod tests {
 
     /// Helper: register a user, delete the auto-generated token, insert a known
     /// token, and return the raw token bytes (hex-encoded) and the employee id.
-    async fn register_with_known_token(service: &DashboardAuthServiceImpl) -> (String, Uuid) {
+    async fn register_with_known_token(
+        service: &DashboardAuthServiceImpl<NoopEmailSender>,
+    ) -> (String, Uuid) {
         service
             .register("owner@example.com", "password1234")
             .await
