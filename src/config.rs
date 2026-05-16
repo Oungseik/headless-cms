@@ -30,6 +30,8 @@ pub struct Config {
     pub allowed_origins: String,
     #[clap(long, env, default_value_t = 86400)]
     pub email_verification_token_ttl: u64,
+    #[clap(long, env, default_value_t = 259200)]
+    pub invitation_token_ttl: u64,
     #[clap(long, env, default_value_t = 12)]
     pub bcrypt_cost: u32,
     #[clap(long, env, default_value_t = true)]
@@ -44,56 +46,20 @@ pub struct Config {
     pub login_rate_limit_burst: u32,
     #[clap(long, env, default_value = "Headless CMS")]
     pub app_name: String,
-    #[clap(long, env, default_value = "")]
+    #[clap(long, env)]
     pub smtp_host: String,
     #[clap(long, env, default_value_t = 587)]
     pub smtp_port: u16,
-    #[clap(long, env, default_value = "")]
+    #[clap(long, env)]
     pub smtp_username: String,
-    #[clap(long, env, default_value = "")]
+    #[clap(long, env)]
     pub smtp_password: String,
-    #[clap(long, env, default_value = "noreply@localhost")]
+    #[clap(long, env)]
     pub smtp_from: String,
     #[clap(long, env, default_value = "Headless CMS")]
     pub smtp_from_name: String,
     #[clap(long, env, default_value_t = true)]
     pub smtp_starttls: bool,
-}
-
-impl std::fmt::Debug for Config {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Config")
-            .field("app_env", &self.app_env)
-            .field("database_url", &"[REDACTED]")
-            .field("address", &self.address)
-            .field("jwt_secret", &"[REDACTED]")
-            .field("access_token_ttl", &self.access_token_ttl)
-            .field("refresh_token_ttl", &self.refresh_token_ttl)
-            .field("base_url", &self.base_url)
-            .field("allowed_origins", &self.allowed_origins)
-            .field(
-                "email_verification_token_ttl",
-                &self.email_verification_token_ttl,
-            )
-            .field("bcrypt_cost", &self.bcrypt_cost)
-            .field("rate_limit_enabled", &self.rate_limit_enabled)
-            .field("rate_limit_per_second", &self.rate_limit_per_second)
-            .field("rate_limit_burst", &self.rate_limit_burst)
-            .field(
-                "login_rate_limit_per_second",
-                &self.login_rate_limit_per_second,
-            )
-            .field("login_rate_limit_burst", &self.login_rate_limit_burst)
-            .field("app_name", &self.app_name)
-            .field("smtp_host", &self.smtp_host)
-            .field("smtp_port", &self.smtp_port)
-            .field("smtp_username", &self.smtp_username)
-            .field("smtp_password", &"[REDACTED]")
-            .field("smtp_from", &self.smtp_from)
-            .field("smtp_from_name", &self.smtp_from_name)
-            .field("smtp_starttls", &self.smtp_starttls)
-            .finish()
-    }
 }
 
 /// Returns a static reference to the global [`Config`].
