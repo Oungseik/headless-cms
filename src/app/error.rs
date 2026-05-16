@@ -55,6 +55,26 @@ impl From<std::io::Error> for AppError {
     }
 }
 
+impl From<crate::features::dashboard_invitations::service::DashboardInvitationServiceError>
+    for AppError
+{
+    fn from(
+        err: crate::features::dashboard_invitations::service::DashboardInvitationServiceError,
+    ) -> Self {
+        use crate::features::dashboard_invitations::service::DashboardInvitationServiceError as E;
+        match err {
+            E::OwnerRoleForbidden => Self::BadRequest("Cannot invite with owner role".to_string()),
+            E::EmailAlreadyEmployee => {
+                Self::Conflict("Email is already registered as an employee".to_string())
+            }
+            E::Database(e) => {
+                tracing::error!("database error: {e}");
+                Self::InternalServerError
+            }
+        }
+    }
+}
+
 impl From<crate::features::dashboard_auth::service::DashboardAuthServiceError> for AppError {
     fn from(err: crate::features::dashboard_auth::service::DashboardAuthServiceError) -> Self {
         use crate::features::dashboard_auth::service::DashboardAuthServiceError as E;

@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS invitation (
 );
 
 -- Create index on invitation.email for pending-invitation lookups
-CREATE INDEX IF NOT EXISTS idx_invitation_email: email_sender ON invitation(email);
+CREATE INDEX IF NOT EXISTS idx_invitation_email_email_sender ON invitation(email);
 
 -- Ensure at most one pending invitation per email
 CREATE UNIQUE INDEX IF NOT EXISTS idx_invitation_pending_email ON invitation(email)

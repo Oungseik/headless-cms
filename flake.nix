@@ -21,7 +21,7 @@
             cargo-nextest
             cargo-outdated
             cargo-tarpaulin
-            sea-orm-cli
+            sqlx-cli
             otel-desktop-viewer
 
             # optional dependencies to make RESTapi request from Neovim

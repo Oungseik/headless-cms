@@ -26,6 +26,7 @@ use crate::{
     email::SmtpEmailSender,
     features,
     features::dashboard_auth::service_impl::{DashboardAuthServiceImpl, TokenConfig},
+    features::dashboard_invitations::service_impl::DashboardInvitationServiceImpl,
 };
 
 /// `OpenAPI` documentation specification.
@@ -51,6 +52,7 @@ impl Modify for SecurityAddon {
 #[derive(Debug)]
 pub struct AppState {
     pub dashboard_auth_service: DashboardAuthServiceImpl<SmtpEmailSender>,
+    pub dashboard_invitation_service: DashboardInvitationServiceImpl<SmtpEmailSender>,
 }
 
 /// Builds the complete Axum [`Router`] with all routes, middleware, and CORS.
@@ -116,7 +118,7 @@ pub async fn create_app() -> AppResult<Router> {
     );
 
     let dashboard_auth_service = DashboardAuthServiceImpl {
-        pool,
+        pool: pool.clone(),
         bcrypt_cost: config.bcrypt_cost,
         email_verification_token_ttl: config.email_verification_token_ttl,
         token_config: TokenConfig {
@@ -124,6 +126,14 @@ pub async fn create_app() -> AppResult<Router> {
             access_token_ttl: config.access_token_ttl,
             refresh_token_ttl: config.refresh_token_ttl,
         },
+        email_sender: email_sender.clone(),
+        app_name: config.app_name.clone(),
+        base_url: config.base_url.clone(),
+    };
+
+    let dashboard_invitation_service = DashboardInvitationServiceImpl {
+        pool: pool.clone(),
+        invitation_token_ttl: config.invitation_token_ttl,
         email_sender,
         app_name: config.app_name.clone(),
         base_url: config.base_url.clone(),
@@ -131,6 +141,7 @@ pub async fn create_app() -> AppResult<Router> {
 
     let state = Arc::new(AppState {
         dashboard_auth_service,
+        dashboard_invitation_service,
     });
 
     let health_route = features::health::router();
@@ -140,10 +151,12 @@ pub async fn create_app() -> AppResult<Router> {
         config.login_rate_limit_per_second,
         config.login_rate_limit_burst,
     );
+    let dashboard_invitations_route = features::dashboard_invitations::router();
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/health", health_route)
         .nest("/api/v1/dashboard/auth", dashboard_auth_route)
+        .nest("/api/v1/dashboard/invitations", dashboard_invitations_route)
         .with_state(state)
         .split_for_parts();
 

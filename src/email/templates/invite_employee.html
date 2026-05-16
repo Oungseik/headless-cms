@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        font-family: sans-serif;
+        line-height: 1.6;
+        color: #333;
+      }
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .btn {
+        display: inline-block;
+        padding: 12px 24px;
+        background: #2563eb;
+        color: #fff;
+        text-decoration: none;
+        border-radius: 6px;
+      }
+      .footer {
+        margin-top: 24px;
+        font-size: 12px;
+        color: #888;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>You've been invited to join {{app_name}}</h2>
+      <p>
+        <strong>{{inviter_email}}</strong> has invited you to join as
+        <strong>{{role}}</strong>.
+      </p>
+      <p>Click the button below to accept your invitation:</p>
+      <p><a href="{{invitation_url}}" class="btn">Accept Invitation</a></p>
+      <p>Or copy this link:</p>
+      <p><code>{{invitation_url}}</code></p>
+      <div class="footer">
+        <p>
+          This invitation expires in 3 days. If you weren't expecting this
+          invitation, you can ignore this email.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>
